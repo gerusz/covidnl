@@ -1,4 +1,3 @@
-import functools
 import urllib.request
 import json
 from typing import List, Dict, Union
@@ -199,9 +198,9 @@ if __name__ == "__main__":
 	cutoff_days = 3
 	
 	try:
-		options, trailing_args = getopt.getopt(sys.argv[1:], "hfw:p:c:", ["force", "window=", "province=", "cutoff="])
+		options, trailing_args = getopt.getopt(sys.argv[1:], "hfw:p:c:", ["help", "force", "window=", "province=", "cutoff="])
 		for option, value in options:
-			if option == "-h":
+			if option in ("-h", "--help"):
 				print_help()
 				sys.exit()
 			elif option in ("-w", "--window"):
