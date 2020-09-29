@@ -21,7 +21,7 @@ Short argument|Long argument|Value required?|Effect
 -h|--help|No|Prints this in a more concise format
 -f|--force|No|Forces the script to redownload the data even if it's less than an hour old
 -w|--window|Yes (integer, \>1 or =0)|\>1: introduces a smoothing window and a trendline on the daily case chart (in orange). 0: disables the trendline. Default: 7.
--p|--province|Yes (a Dutch province, by its Dutch name, see below)|Filters the data to a certain province
+-p|--province|Yes (a Dutch province, by its Dutch name, see below)|Filters the data to a certain province. If absent, countrywide stats are shown.
 -c|--cutoff|Yes (integer, >=0)|Defines how many days should be cut off from the end. (Data comes in from the provinces with a delay, so the last few days are unreliable.) Default: 3.
 
 #### Provinces:
