@@ -9,29 +9,39 @@ import re
 import os.path
 from progressbar import ProgressBar, Percentage, Bar
 
+JSON_URL = "https://data.rivm.nl/covid-19/COVID-19_casus_landelijk.json"
+
 
 class CovidCase:
+	"""
+	Represents a single registered case
+	"""
 	
-	file_date: datetime = None 
+	file_date: datetime = None
 	
 	def __init__(
 			self,
-			Date_statistics: str,
-			Agegroup: str,
-			Sex: str,
-			Province: str,
-			Hospital_admission: str,
-			Deceased: str
+			date_statistics: str,
+			age_group: str,
+			sex: str,
+			province: str,
+			hospital_admission: str,
+			deceased: str
 	):
-		self.day: datetime.date = datetime.date.fromisoformat(Date_statistics)
-		self.age: str = Agegroup
-		self.sex: str = Sex
-		self.province: str = Province
-		self.hospitalized: bool = (Hospital_admission == "Yes")
-		self.dead: bool = (Deceased == "Yes")
+		self.day: datetime.date = datetime.date.fromisoformat(date_statistics)
+		self.age: str = age_group
+		self.sex: str = sex
+		self.province: str = province
+		self.hospitalized: bool = (hospital_admission == "Yes")
+		self.dead: bool = (deceased == "Yes")
 	
 	@staticmethod
 	def from_dict(jsondict):
+		"""
+		Loads the details of this case from a JSON dictionary
+		:param jsondict: The JSON dictionary containing the details of the case
+		:return: The CovidCase representation of the given case
+		"""
 		if CovidCase.file_date is None:
 			CovidCase.file_date = datetime.datetime.fromisoformat(jsondict["Date_file"])
 		return CovidCase(
@@ -60,10 +70,16 @@ provinces = (
 
 
 def validate_province(arg_value: str) -> str:
+	"""
+	Validates a province argument against the list of Dutch provinces.
+	:param arg_value: The input value
+	:return: The province value. Capitalization is corrected, dashes are added when necessary, etc...
+	"""
 	if arg_value in provinces:
 		return arg_value
 	elif arg_value.lower() == "fryslân":
 		return "Friesland"
+	# Friesland is a special case, since the province has a different official name in its own minority language.
 	else:
 		# Case correction and such
 		p = re.compile("\\W")
@@ -75,9 +91,14 @@ def validate_province(arg_value: str) -> str:
 		print("The acceptable values are:")
 		print(provinces, sep=", ")
 		sys.exit(2)
-		
-		
+
+
 def validate_cutoff(arg_value: Union[str, int]) -> int:
+	"""
+	Validates a cutoff value. The input must be an integer greater or equal to 0.
+	:param arg_value: The input argument
+	:return: The argument parsed to an int if it's valid
+	"""
 	try:
 		parsed = int(arg_value)
 		if parsed < 0:
@@ -90,15 +111,20 @@ def validate_cutoff(arg_value: Union[str, int]) -> int:
 
 
 latest_file_location = "latest.json"
-pbar = ProgressBar(widgets=[Percentage(), Bar()])
+progress_bar = ProgressBar(widgets=[Percentage(), Bar()])
 
 
-def dl_progress(count, blockSize, totalSize):
-	global pbar
-	pbar.update(int(count * blockSize * 100 / totalSize))
-	
+def dl_progress(count, block_size, total_size):
+	global progress_bar
+	progress_bar.update(int(count * block_size * 100 / total_size))
+
 
 def validate_smoothing_window(arg_value: Union[str, int]) -> int:
+	"""
+	Validates the smoothing window for the trendline. Allowed values are 0 or integers >=2.
+	:param arg_value: The input value
+	:return: The input parsed to an int if it's valid
+	"""
 	try:
 		parsed = int(arg_value)
 		if parsed < 2 and parsed != 0:
@@ -111,23 +137,31 @@ def validate_smoothing_window(arg_value: Union[str, int]) -> int:
 
 
 def main(smoothing_window: int, province_filter: Union[str, None], ignore_days: int = 3, force_download: bool = False):
-	
+	"""
+	The main function for the stat script. Downloads, processes, and displays the stats.
+	:param smoothing_window: The window for the trendline
+	:param province_filter: The province to look for. None means no filtering.
+	:param ignore_days: Cutoff days, ignore this many days from the end of the stats
+	:param force_download: Whether the stats have to be downloaded even if they are relatively new.
+	:return: No return value.
+	"""
 	should_download: bool = True
 	if not force_download and os.path.isfile(latest_file_location):
 		cache_date: datetime = datetime.datetime.fromtimestamp(os.path.getmtime(latest_file_location))
 		one_hour_ago = datetime.datetime.now() - datetime.timedelta(hours=1)
 		if cache_date > one_hour_ago:
 			should_download = False
-			
+	
 	if should_download:
 		print("Downloading most recent data...")
-		global pbar
-		pbar.start()
-		urllib.request.urlretrieve("https://data.rivm.nl/covid-19/COVID-19_casus_landelijk.json", latest_file_location, reporthook=dl_progress)
+		global progress_bar
+		progress_bar.start()
+		urllib.request.urlretrieve(JSON_URL, latest_file_location, reporthook=dl_progress)
 		print("Data downloaded.")
 	else:
-		print("File exists in cache as {}, using cached file. Launch the script with -f or --force to force loading the most recent file".format(os.path.abspath(latest_file_location)))
-		
+		print("File exists in cache as {}, using cached file. Launch the script with -f or --force to force loading the most recent file".format(
+			os.path.abspath(latest_file_location)))
+	
 	jsondata = json.load(open(latest_file_location))
 	cases = list(map(lambda j: CovidCase.from_dict(j), jsondata))
 	# Get cases per day
@@ -147,6 +181,8 @@ def main(smoothing_window: int, province_filter: Union[str, None], ignore_days: 
 		print("Day: {}\tCases:{}".format(day, cases_per_day[day]))
 	tuples = sorted(cases_per_day.items())
 	keys, values = zip(*tuples)
+	
+	# Daily cases plot
 	plt.subplot(221)
 	if smoothing_window != 0:
 		smoothed: List[float] = list()
@@ -163,24 +199,53 @@ def main(smoothing_window: int, province_filter: Union[str, None], ignore_days: 
 	plt.xlabel("Date")
 	plt.xticks(rotation="vertical")
 	plt.ylabel("Cases")
+	
+	# Cumulative cases plot
+	plt.subplot(222)
 	cumulative: List[float] = list()
 	cumulative.append(values[0])
 	for day in days[1::]:
 		cumulative.append(cumulative[-1] + cases_per_day[day])
-	plt.subplot(222)
 	plt.plot(keys, cumulative)
 	plt.yscale("log")
 	plt.title("Cumulative cases (log)")
 	plt.xlabel("Date")
 	plt.ylabel("Cumulative cases (log)")
 	plt.xticks(rotation="vertical")
+	
+	# Reproduction rate plot
 	plt.subplot(212)
-	plt.plot(cumulative, values)
+	
+	rates: List[float] = list()
+	cumulative_x: List[float] = list()
+	used_values: List[float] = list()
+	for idx in range(len(values)):
+		if cumulative[idx] > 25:
+			rates.append(values[idx] / cumulative[idx])
+			cumulative_x.append(cumulative[idx])
+			used_values.append(values[idx])
+	
+	avg_rate = sum(rates) / len(rates)
+	exponent_trendline = list(x * avg_rate for x in cumulative_x)
+	
+	exponent_trendline_diff = list((used_values[i] - exponent_trendline[i]) / cumulative_x[i] for i in range(len(used_values)))
+	second_wave_start = min(exponent_trendline_diff)
+	second_wave_start_idx = exponent_trendline_diff.index(second_wave_start)
+	
+	second_wave_x = cumulative_x[second_wave_start_idx::]
+	second_wave_rates = rates[second_wave_start_idx::]
+	second_wave_avg_rate = sum(second_wave_rates) / len(second_wave_rates)
+	second_wave_trendline = list(x * second_wave_avg_rate for x in second_wave_x)
+	
+	plt.plot(cumulative_x, used_values, label="Rate")
+	plt.plot(cumulative_x, exponent_trendline, label="Overall trendline")
+	plt.plot(second_wave_x, second_wave_trendline, label="Second wave trendline")
 	plt.xscale("log")
 	plt.yscale("log")
 	plt.title("Daily cases by cumulative cases (log-log), ~R-value")
 	plt.xlabel("Cumulative cases")
 	plt.ylabel("Daily cases")
+	plt.legend()
 	plt.gcf().canvas.set_window_title("Covid 19 in " + ("the whole Netherlands" if province_filter is None else province_filter))
 	plt.subplots_adjust(hspace=1, wspace=0.3)
 	plt.show()
@@ -192,7 +257,7 @@ def print_help():
 
 if __name__ == "__main__":
 	
-	smoothing_window = 0
+	smoothing_window = 7
 	province_filter = None
 	force_download = False
 	cutoff_days = 3

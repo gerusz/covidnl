@@ -10,11 +10,11 @@ The charts are:
 * Top right: cumulative cases on a logarithmic scale
 * Bottom: cumulative cases and daily cases charted on a log-log scale. A downwards trend shows a <1 reproduction rate.
 
-The file is [found here](https://data.rivm.nl/covid-19/COVID-19_casus_landelijk.json). Warning, it's a 30 MB JSON file (that's going to be fatter the more the govt. fails the pandemic response) so try to open it with a sane text editor. (That is, not notepad.)
+The file is [found here](https://data.rivm.nl/covid-19/COVID-19_casus_landelijk.json). Warning, it's a 30 MB JSON file (that's going to be fatter the more the govt. botches the pandemic response) so try to open it with a sane text editor. (That is, not notepad.)
 
 #How to use it?
 
-The best way to run it is to run covidstats.py with some launch arguments. These are:
+The best way to run it is to run covidstats.py with some launch arguments. They are all optional, by default the data will show countrywide stats excluding the last 3 days, and a trendline with a 7-day smoothing window. The arguments are:
 
 Short argument|Long argument|Value required?|Effect
 ---|---|---|---
