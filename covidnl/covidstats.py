@@ -86,7 +86,7 @@ def validate_province(arg_value: str) -> str:
 		for province in provinces:
 			if p.sub("", province).lower() == p.sub("", arg_value).lower():
 				return province
-	if province_filter is None:
+	if province_filter_arg is None:
 		print("{} is not a valid Dutch province name.".format(arg_value))
 		print("The acceptable values are:")
 		print(provinces, sep=", ")
@@ -164,54 +164,75 @@ def main(smoothing_window: int, province_filter: Union[str, None], ignore_days: 
 	
 	jsondata = json.load(open(latest_file_location))
 	cases = list(map(lambda j: CovidCase.from_dict(j), jsondata))
+	
 	# Get cases per day
-	# I would do something saner in a sane programming language, but alas...
 	cases_per_day: Dict[datetime.date, int] = dict()
+	deaths_per_day: Dict[datetime.date, int] = dict()
 	cutoff_day: datetime.date = CovidCase.file_date.date() - datetime.timedelta(days=ignore_days)
 	for ccase in cases:
 		if ccase.day > cutoff_day:
-			# Skip today's values because they are useless
+			# Skip recent values, those days are most likely incomplete.
 			continue
 		if province_filter is not None and ccase.province != province_filter:
 			continue
 		cases_per_day[ccase.day] = cases_per_day.get(ccase.day, 0) + 1
+		if ccase.dead:
+			deaths_per_day[ccase.day] = deaths_per_day.get(ccase.day, 0) + 1
 	days = list(cases_per_day.keys())
 	days.sort()
 	for day in days:
-		print("Day: {}\tCases:{}".format(day, cases_per_day[day]))
-	tuples = sorted(cases_per_day.items())
-	keys, values = zip(*tuples)
+		print("Day: {}\tCases:{}\tDeaths:{}".format(day, cases_per_day[day], deaths_per_day.get(day, 0)))
+	case_tuples = sorted(cases_per_day.items())
+	case_days, case_counts = zip(*case_tuples)
+	
+	death_tuples = sorted(deaths_per_day.items())
+	death_days, death_counts = zip(*death_tuples)
+	
+	# Set the window to about 960 x 768
+	plt.figure(figsize=(10, 8), dpi=96)
 	
 	# Daily cases plot
 	plt.subplot(221)
+	plt.plot(case_days, case_counts, label="Daily cases")
+	plt.plot(death_days, death_counts, label="Of them dead")
 	if smoothing_window != 0:
-		smoothed: List[float] = list()
+		smoothed_cases: List[float] = list()
+		smoothed_deaths: List[float] = list()
 		for day_idx in range(smoothing_window, len(days) + 1, 1):
 			case_sum = 0
+			death_sum = 0
 			for window in range(day_idx - smoothing_window, day_idx, 1):
-				case_sum += cases_per_day[days[window]]
-			smoothed.append(case_sum / float(smoothing_window))
-		plt.plot(keys, values, keys[smoothing_window - 1::], smoothed)
+				case_sum += cases_per_day.get(days[window], 0)  # Let's prepare for the end of this bullshit, like the damn optimist I am...
+				death_sum += deaths_per_day.get(days[window], 0)
+			smoothed_cases.append(case_sum / float(smoothing_window))
+			smoothed_deaths.append(death_sum / float(smoothing_window))
+		plt.plot(case_days[smoothing_window - 1::], smoothed_cases, label="Trend ({} day avg.)".format(smoothing_window))
+		plt.plot(case_days[smoothing_window - 1::], smoothed_deaths, label="Death trend ({} day avg.)".format(smoothing_window))
 		plt.title("Daily cases and trend (smoothing window: {})".format(smoothing_window))
 	else:
-		plt.plot(keys, values)
 		plt.title("Daily cases")
 	plt.xlabel("Date")
 	plt.xticks(rotation="vertical")
 	plt.ylabel("Cases")
+	plt.legend()
 	
 	# Cumulative cases plot
 	plt.subplot(222)
-	cumulative: List[float] = list()
-	cumulative.append(values[0])
+	cumulative_cases: List[float] = list()
+	cumulative_deaths: List[float] = list()
+	cumulative_cases.append(case_counts[0])
+	cumulative_deaths.append(0)
 	for day in days[1::]:
-		cumulative.append(cumulative[-1] + cases_per_day[day])
-	plt.plot(keys, cumulative)
+		cumulative_cases.append(cumulative_cases[-1] + cases_per_day.get(day, 0))  # Again, my world-famous optimism.
+		cumulative_deaths.append(cumulative_deaths[-1] + deaths_per_day.get(day, 0))
+	plt.plot(case_days, cumulative_cases, label="Cases")
+	plt.plot(case_days, cumulative_deaths, label="Deaths")
 	plt.yscale("log")
 	plt.title("Cumulative cases (log)")
 	plt.xlabel("Date")
 	plt.ylabel("Cumulative cases (log)")
 	plt.xticks(rotation="vertical")
+	plt.legend()
 	
 	# Reproduction rate plot
 	plt.subplot(212)
@@ -219,11 +240,11 @@ def main(smoothing_window: int, province_filter: Union[str, None], ignore_days: 
 	rates: List[float] = list()
 	cumulative_x: List[float] = list()
 	used_values: List[float] = list()
-	for idx in range(len(values)):
-		if cumulative[idx] > 25:
-			rates.append(values[idx] / cumulative[idx])
-			cumulative_x.append(cumulative[idx])
-			used_values.append(values[idx])
+	for idx in range(len(case_counts)):
+		if cumulative_cases[idx] > 25:
+			rates.append(case_counts[idx] / cumulative_cases[idx])
+			cumulative_x.append(cumulative_cases[idx])
+			used_values.append(case_counts[idx])
 	
 	avg_rate = sum(rates) / len(rates)
 	exponent_trendline = list(x * avg_rate for x in cumulative_x)
@@ -247,7 +268,7 @@ def main(smoothing_window: int, province_filter: Union[str, None], ignore_days: 
 	plt.ylabel("Daily cases")
 	plt.legend()
 	plt.gcf().canvas.set_window_title("Covid 19 in " + ("the whole Netherlands" if province_filter is None else province_filter))
-	plt.subplots_adjust(hspace=1, wspace=0.3)
+	plt.subplots_adjust(hspace=0.35, wspace=0.25, left=0.07, right=0.95, top=0.95, bottom=0.07)
 	plt.show()
 
 
@@ -257,9 +278,9 @@ def print_help():
 
 if __name__ == "__main__":
 	
-	smoothing_window = 7
-	province_filter = None
-	force_download = False
+	smoothing_window_arg = 7
+	province_filter_arg = None
+	force_download_arg = False
 	cutoff_days = 3
 	
 	try:
@@ -269,15 +290,15 @@ if __name__ == "__main__":
 				print_help()
 				sys.exit()
 			elif option in ("-w", "--window"):
-				smoothing_window = validate_smoothing_window(value)
+				smoothing_window_arg = validate_smoothing_window(value)
 			elif option in ("-p", "--province"):
-				province_filter = validate_province(value)
+				province_filter_arg = validate_province(value)
 			elif option in ("-c", "--cutoff"):
 				cutoff_days = validate_cutoff(value)
 			elif option in ("-f", "--force"):
-				force_download = True
+				force_download_arg = True
 	except getopt.GetoptError:
 		print_help()
 		sys.exit(2)
 	
-	main(smoothing_window, province_filter, cutoff_days, force_download)
+	main(smoothing_window_arg, province_filter_arg, cutoff_days, force_download_arg)
