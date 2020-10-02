@@ -8,6 +8,7 @@ import urllib.request
 from typing import List, Dict, Union, Tuple
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 from progressbar import ProgressBar, Percentage, Bar
 
@@ -197,12 +198,12 @@ def main(smoothing_window: int, province_filter: Union[str, None], cutoff_days: 
 	days = list(cases_per_day.keys())
 	days.sort()
 	for day in days:
-		print("Day: {}\tCases:{}\tDeaths:{}".format(day, cases_per_day[day], deaths_per_day.get(day, 0)))
-	case_tuples = sorted(cases_per_day.items())
-	case_days, case_counts = zip(*case_tuples)
+		if day not in deaths_per_day.keys():
+			deaths_per_day[day] = 0
+		print("Day: {}\tCases:{}\tDeaths:{}".format(day, cases_per_day[day], deaths_per_day.get(day)))
 	
-	death_tuples = sorted(deaths_per_day.items())
-	death_days, death_counts = zip(*death_tuples)
+	case_counts = np.array(tuple(cases_per_day[day] for day in days))
+	death_counts = np.array(tuple(deaths_per_day[day] for day in days))
 	
 	# Get the data lines split by the stacking criterion if it's present
 	if stack is not None:
@@ -224,7 +225,7 @@ def main(smoothing_window: int, province_filter: Union[str, None], cutoff_days: 
 				"80-89",
 				"90+"
 			)
-		stacked_cases_per_day: Union[np.ndarray, None] = np.zeros((len(stack_labels), len(case_days)), dtype=int)
+		stacked_cases_per_day: Union[np.ndarray, None] = np.zeros((len(stack_labels), len(days)), dtype=int)
 		
 		for ccase in cases:
 			if ccase.day > cutoff_day:
@@ -235,7 +236,7 @@ def main(smoothing_window: int, province_filter: Union[str, None], cutoff_days: 
 			stack_key = ccase.province if stack == "province" else (ccase.sex if stack == "sex" else ccase.age)
 			if stack_key in stack_labels:
 				stack_idx = stack_labels.index(stack_key)
-				day_idx = case_days.index(ccase.day)
+				day_idx = days.index(ccase.day)
 				stacked_cases_per_day[stack_idx][day_idx] += 1
 	
 	else:
@@ -245,41 +246,43 @@ def main(smoothing_window: int, province_filter: Union[str, None], cutoff_days: 
 	# BMH has almost enough colors for the age and the province stacking, and I'm too lazy to make my own palettes, so...
 	plt.style.use("bmh")
 	
-	# Set the window to about 960 x 768
-	plt.figure(figsize=(10, 8), dpi=96)
+	# Set the window to about 1344 x 768
+	plt.figure(figsize=(14, 8), dpi=96)
 	
 	# Daily cases plot
-	plt.subplot(221)
+	sp = plt.subplot(211)
 	if stack is None:
-		plt.plot(case_days, case_counts, label="Daily cases")
-		plt.plot(death_days, death_counts, label="Of them dead")
+		plt.plot(days, case_counts, label="Daily cases")
+		plt.plot(days, death_counts, label="Of them dead")
 		if smoothing_window != 0:
-			smoothed_cases: List[float] = list()
-			smoothed_deaths: List[float] = list()
-			for day_idx in range(smoothing_window, len(days) + 1, 1):
-				case_sum = 0
-				death_sum = 0
-				for window in range(day_idx - smoothing_window, day_idx, 1):
-					case_sum += cases_per_day.get(days[window], 0)  # Let's prepare for the end of this bullshit, like the damn optimist I am...
-					death_sum += deaths_per_day.get(days[window], 0)
-				smoothed_cases.append(case_sum / float(smoothing_window))
-				smoothed_deaths.append(death_sum / float(smoothing_window))
-			plt.plot(case_days[smoothing_window - 1::], smoothed_cases, label="Trend ({} day avg.)".format(smoothing_window))
-			plt.plot(case_days[smoothing_window - 1::], smoothed_deaths, label="Death trend ({} day avg.)".format(smoothing_window))
+			smoothed_cases: np.ndarray = np.zeros(len(days))
+			smoothed_deaths: np.ndarray = np.zeros(len(days))
+			for day_idx in range(smoothing_window, len(days) + 1):
+				case_sum = sum(case_counts[day_idx - smoothing_window:day_idx:])
+				death_sum = sum(death_counts[day_idx - smoothing_window:day_idx:])
+				
+				smoothed_cases[day_idx - 1] = case_sum / smoothing_window
+				smoothed_deaths[day_idx - 1] = death_sum / smoothing_window
+			plt.plot(days, smoothed_cases, label="Trend ({} day avg.)".format(smoothing_window))
+			plt.plot(days, smoothed_deaths, label="Death trend ({} day avg.)".format(smoothing_window))
 			plt.title("Daily cases and trend (smoothing window: {})".format(smoothing_window))
 		else:
 			plt.title("Daily cases")
 	else:
-		plt.stackplot(case_days, stacked_cases_per_day, labels=stack_labels)
+		plt.stackplot(days, stacked_cases_per_day, labels=stack_labels)
 		plt.title("Daily cases stacked by {}".format(stack))
 	plt.xlabel("Date")
 	plt.xticks(rotation="vertical")
+	sp.xaxis.set_major_locator(ticker.MultipleLocator(7))
+	sp.xaxis.set_minor_locator(ticker.AutoMinorLocator(7))
+	sp.yaxis.set_major_locator(ticker.MultipleLocator(200))
+	sp.yaxis.set_minor_locator(ticker.AutoMinorLocator(4))
 	plt.ylabel("Cases")
 	plt.legend(loc='upper left')
 	plt.margins(x=0)
 	
 	# Cumulative cases plot
-	plt.subplot(222)
+	plt.subplot(223)
 	cumulative_cases: List[float] = list()
 	cumulative_deaths: List[float] = list()
 	cumulative_cases.append(case_counts[0])
@@ -287,34 +290,34 @@ def main(smoothing_window: int, province_filter: Union[str, None], cutoff_days: 
 	for day in days[1::]:
 		cumulative_cases.append(cumulative_cases[-1] + cases_per_day.get(day, 0))  # Again, my world-famous optimism.
 		cumulative_deaths.append(cumulative_deaths[-1] + deaths_per_day.get(day, 0))
-	plt.plot(case_days, cumulative_cases, label="Cases")
-	plt.plot(case_days, cumulative_deaths, label="Deaths")
+	plt.plot(days, cumulative_cases, label="Cases")
+	plt.plot(days, cumulative_deaths, label="Deaths")
 	plt.yscale("log")
 	plt.title("Cumulative cases (log)")
 	plt.xlabel("Date")
 	plt.ylabel("Cumulative cases (log)")
-	plt.xticks(rotation="vertical")
+	plt.xticks(rotation=45)
 	plt.legend()
 	plt.margins(x=0)
 	
 	# Reproduction rate plot
-	plt.subplot(212)
+	plt.subplot(224)
 	
-	rates: List[float] = list()
-	cumulative_x: List[float] = list()
-	used_values: List[float] = list()
-	for idx in range(len(case_counts)):
-		if cumulative_cases[idx] > 25:
-			rates.append(case_counts[idx] / cumulative_cases[idx])
-			cumulative_x.append(cumulative_cases[idx])
-			used_values.append(case_counts[idx])
+	r_rate_start = 0
+	for r_rate_start in range(len(cumulative_cases)):
+		if cumulative_cases[r_rate_start] >= 50:
+			break
+	
+	cumulative_x: List[float] = cumulative_cases[r_rate_start::]
+	used_values: List[float] = case_counts[r_rate_start::]
+	rates: List[float] = list((x[0] / x[1] for x in zip(used_values, cumulative_x)))
 	
 	avg_rate = sum(rates) / len(rates)
 	exponent_trendline = list(x * avg_rate for x in cumulative_x)
 	
 	exponent_trendline_diff = list((used_values[i] - exponent_trendline[i]) / cumulative_x[i] for i in range(len(used_values)))
-	second_wave_start = min(exponent_trendline_diff)
-	second_wave_start_idx = exponent_trendline_diff.index(second_wave_start)
+	# second_wave_start = min(exponent_trendline_diff)
+	second_wave_start_idx = np.argmin(exponent_trendline_diff)  # exponent_trendline_diff.index(second_wave_start)
 	
 	second_wave_x = cumulative_x[second_wave_start_idx::]
 	second_wave_rates = rates[second_wave_start_idx::]
