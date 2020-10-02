@@ -1,12 +1,14 @@
-import urllib.request
-import json
-from typing import List, Dict, Union
 import datetime
-import matplotlib.pyplot as plt
 import getopt
-import sys
-import re
+import json
 import os.path
+import re
+import sys
+import urllib.request
+from typing import List, Dict, Union, Tuple
+
+import matplotlib.pyplot as plt
+import numpy as np
 from progressbar import ProgressBar, Percentage, Bar
 
 JSON_URL = "https://data.rivm.nl/covid-19/COVID-19_casus_landelijk.json"
@@ -136,12 +138,26 @@ def validate_smoothing_window(arg_value: Union[str, int]) -> int:
 	return parsed
 
 
-def main(smoothing_window: int, province_filter: Union[str, None], ignore_days: int = 3, force_download: bool = False):
+def validate_stack(arg_value: str) -> str:
+	"""
+	Validates the stack value, returning the literal value with the expected capitalization
+	:param arg_value: The input value
+	:return: The literal value with the expected capitalization
+	"""
+	lowercase = arg_value.lower()
+	if lowercase in ("sex", "age", "province"):
+		return lowercase
+	print("Stacking must be done by sex, age, or province! Not {}.".format(arg_value))
+	sys.exit(2)
+
+
+def main(smoothing_window: int, province_filter: Union[str, None], cutoff_days: int = 3, stack=None, force_download: bool = False):
 	"""
 	The main function for the stat script. Downloads, processes, and displays the stats.
 	:param smoothing_window: The window for the trendline
 	:param province_filter: The province to look for. None means no filtering.
-	:param ignore_days: Cutoff days, ignore this many days from the end of the stats
+	:param cutoff_days: Cutoff days, ignore this many days from the end of the stats
+	:param stack: The value to stack the daily trends by.
 	:param force_download: Whether the stats have to be downloaded even if they are relatively new.
 	:return: No return value.
 	"""
@@ -168,7 +184,7 @@ def main(smoothing_window: int, province_filter: Union[str, None], ignore_days: 
 	# Get cases per day
 	cases_per_day: Dict[datetime.date, int] = dict()
 	deaths_per_day: Dict[datetime.date, int] = dict()
-	cutoff_day: datetime.date = CovidCase.file_date.date() - datetime.timedelta(days=ignore_days)
+	cutoff_day: datetime.date = CovidCase.file_date.date() - datetime.timedelta(days=cutoff_days)
 	for ccase in cases:
 		if ccase.day > cutoff_day:
 			# Skip recent values, those days are most likely incomplete.
@@ -188,33 +204,79 @@ def main(smoothing_window: int, province_filter: Union[str, None], ignore_days: 
 	death_tuples = sorted(deaths_per_day.items())
 	death_days, death_counts = zip(*death_tuples)
 	
+	# Get the data lines split by the stacking criterion if it's present
+	if stack is not None:
+		if stack == "province":
+			stack_labels: Union[Tuple, None] = provinces
+		elif stack == "sex":
+			stack_labels = ("Male", "Female")
+		else:
+			stack_labels = (
+				"Unknown",
+				"0-9",
+				"10-19",
+				"20-29",
+				"30-39",
+				"40-49",
+				"50-59",
+				"60-69",
+				"70-79",
+				"80-89",
+				"90+"
+			)
+		stacked_cases_per_day: Union[np.ndarray, None] = np.zeros((len(stack_labels), len(case_days)), dtype=int)
+		
+		for ccase in cases:
+			if ccase.day > cutoff_day:
+				# Skip recent values, those days are most likely incomplete.
+				continue
+			if province_filter is not None and ccase.province != province_filter:
+				continue
+			stack_key = ccase.province if stack == "province" else (ccase.sex if stack == "sex" else ccase.age)
+			if stack_key in stack_labels:
+				stack_idx = stack_labels.index(stack_key)
+				day_idx = case_days.index(ccase.day)
+				stacked_cases_per_day[stack_idx][day_idx] += 1
+	
+	else:
+		stacked_cases_per_day = None
+		stack_labels = None
+	
+	# BMH has almost enough colors for the age and the province stacking, and I'm too lazy to make my own palettes, so...
+	plt.style.use("bmh")
+	
 	# Set the window to about 960 x 768
 	plt.figure(figsize=(10, 8), dpi=96)
 	
 	# Daily cases plot
 	plt.subplot(221)
-	plt.plot(case_days, case_counts, label="Daily cases")
-	plt.plot(death_days, death_counts, label="Of them dead")
-	if smoothing_window != 0:
-		smoothed_cases: List[float] = list()
-		smoothed_deaths: List[float] = list()
-		for day_idx in range(smoothing_window, len(days) + 1, 1):
-			case_sum = 0
-			death_sum = 0
-			for window in range(day_idx - smoothing_window, day_idx, 1):
-				case_sum += cases_per_day.get(days[window], 0)  # Let's prepare for the end of this bullshit, like the damn optimist I am...
-				death_sum += deaths_per_day.get(days[window], 0)
-			smoothed_cases.append(case_sum / float(smoothing_window))
-			smoothed_deaths.append(death_sum / float(smoothing_window))
-		plt.plot(case_days[smoothing_window - 1::], smoothed_cases, label="Trend ({} day avg.)".format(smoothing_window))
-		plt.plot(case_days[smoothing_window - 1::], smoothed_deaths, label="Death trend ({} day avg.)".format(smoothing_window))
-		plt.title("Daily cases and trend (smoothing window: {})".format(smoothing_window))
+	if stack is None:
+		plt.plot(case_days, case_counts, label="Daily cases")
+		plt.plot(death_days, death_counts, label="Of them dead")
+		if smoothing_window != 0:
+			smoothed_cases: List[float] = list()
+			smoothed_deaths: List[float] = list()
+			for day_idx in range(smoothing_window, len(days) + 1, 1):
+				case_sum = 0
+				death_sum = 0
+				for window in range(day_idx - smoothing_window, day_idx, 1):
+					case_sum += cases_per_day.get(days[window], 0)  # Let's prepare for the end of this bullshit, like the damn optimist I am...
+					death_sum += deaths_per_day.get(days[window], 0)
+				smoothed_cases.append(case_sum / float(smoothing_window))
+				smoothed_deaths.append(death_sum / float(smoothing_window))
+			plt.plot(case_days[smoothing_window - 1::], smoothed_cases, label="Trend ({} day avg.)".format(smoothing_window))
+			plt.plot(case_days[smoothing_window - 1::], smoothed_deaths, label="Death trend ({} day avg.)".format(smoothing_window))
+			plt.title("Daily cases and trend (smoothing window: {})".format(smoothing_window))
+		else:
+			plt.title("Daily cases")
 	else:
-		plt.title("Daily cases")
+		plt.stackplot(case_days, stacked_cases_per_day, labels=stack_labels)
+		plt.title("Daily cases stacked by {}".format(stack))
 	plt.xlabel("Date")
 	plt.xticks(rotation="vertical")
 	plt.ylabel("Cases")
-	plt.legend()
+	plt.legend(loc='upper left')
+	plt.margins(x=0)
 	
 	# Cumulative cases plot
 	plt.subplot(222)
@@ -233,6 +295,7 @@ def main(smoothing_window: int, province_filter: Union[str, None], ignore_days: 
 	plt.ylabel("Cumulative cases (log)")
 	plt.xticks(rotation="vertical")
 	plt.legend()
+	plt.margins(x=0)
 	
 	# Reproduction rate plot
 	plt.subplot(212)
@@ -267,13 +330,16 @@ def main(smoothing_window: int, province_filter: Union[str, None], ignore_days: 
 	plt.xlabel("Cumulative cases")
 	plt.ylabel("Daily cases")
 	plt.legend()
+	plt.margins(x=0)
+	
 	plt.gcf().canvas.set_window_title("Covid 19 in " + ("the whole Netherlands" if province_filter is None else province_filter))
 	plt.subplots_adjust(hspace=0.35, wspace=0.25, left=0.07, right=0.95, top=0.95, bottom=0.07)
 	plt.show()
 
 
 def print_help():
-	print("Usage: covidstats.py [(-w|--window) <trend smoothing window>] [(-p|--province) <province>] [(-c|--cutoff) <cutoff days>] [(-f|--force)]")
+	print(
+		"Usage: covidstats.py [(-w|--window) <trend smoothing window>] [(-p|--province) <province>] [(-c|--cutoff) <cutoff days>] [(-s|--stack) (sex|age|province)] [(-f|--force)]")
 
 
 if __name__ == "__main__":
@@ -281,10 +347,11 @@ if __name__ == "__main__":
 	smoothing_window_arg = 7
 	province_filter_arg = None
 	force_download_arg = False
-	cutoff_days = 3
+	cutoff_days_arg = 3
+	stack_arg = None
 	
 	try:
-		options, trailing_args = getopt.getopt(sys.argv[1:], "hfw:p:c:", ["help", "force", "window=", "province=", "cutoff="])
+		options, trailing_args = getopt.getopt(sys.argv[1:], "hfw:p:c:s:", ["help", "force", "window=", "province=", "cutoff=", "stack="])
 		for option, value in options:
 			if option in ("-h", "--help"):
 				print_help()
@@ -294,11 +361,17 @@ if __name__ == "__main__":
 			elif option in ("-p", "--province"):
 				province_filter_arg = validate_province(value)
 			elif option in ("-c", "--cutoff"):
-				cutoff_days = validate_cutoff(value)
+				cutoff_days_arg = validate_cutoff(value)
 			elif option in ("-f", "--force"):
 				force_download_arg = True
+			elif option in ("-s", "--stack"):
+				stack_arg = validate_stack(value)
 	except getopt.GetoptError:
 		print_help()
 		sys.exit(2)
 	
-	main(smoothing_window_arg, province_filter_arg, cutoff_days, force_download_arg)
+	if stack_arg == "province" and province_filter_arg is not None:
+		print("Can't stack by province with a province filter!")
+		sys.exit(2)
+	
+	main(smoothing_window_arg, province_filter_arg, cutoff_days_arg, stack_arg, force_download_arg)

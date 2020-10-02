@@ -23,6 +23,7 @@ Short argument|Long argument|Value required?|Effect
 -w|--window|Yes (integer, \>1 or =0)|\>1: introduces a smoothing window and a trendline on the daily case chart (in orange). 0: disables the trendline. Default: 7.
 -p|--province|Yes (a Dutch province, by its Dutch name, see below)|Filters the data to a certain province. If absent, countrywide stats are shown.
 -c|--cutoff|Yes (integer, >=0)|Defines how many days should be cut off from the end. (Data comes in from the provinces with a delay, so the last few days are unreliable.) Default: 3.
+-s|--stack|Yes (age, sex, or province)|Instead of a simple daily case plot, plots a stacked area chart. Caveats: Smoothing is disabled (so the argument is irrelevant) and province stacking + province filtering doesn't work (for obvious reasons).
 
 #### Provinces:
 
