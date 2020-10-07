@@ -9,4 +9,4 @@ def get_stats(smoothing_window: int, province_filter: Union[str, None], ignore_d
 	sw = covidnl.util.validate_smoothing_window(smoothing_window)
 	prov = covidnl.util.validate_province(province_filter)
 	ignore_days = covidnl.util.validate_cutoff(ignore_days)
-	covidnl.covidstats.main(sw, CaseFilter(province_filter=prov), ignore_days, force_download=force_download)
+	covidnl.covidstats.main(sw, CaseFilter(province_filter=prov), force_download=force_download)

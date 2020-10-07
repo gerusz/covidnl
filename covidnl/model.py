@@ -107,10 +107,17 @@ class CaseFilter:
 		age_tuples = CaseFilter.ages[first_range_idx:last_range_idx + 1:]
 		return tuple(x[0] for x in age_tuples)
 	
-	def __init__(self, province_filter: Union[str, None] = None, age_filter: Union[str, Tuple[int, Union[int, None]], None] = None):
+	def __init__(self, province_filter: Union[str, None] = None, age_filter: Union[str, Tuple[int, Union[int, None]], None] = None,
+	             from_date: Union[datetime.date, None] = None, cutoff_date: Union[datetime.date, None] = None):
 		self.province_filter = province_filter
 		self.age_filter = CaseFilter.process_age_filter(age_filter) if age_filter is not None else None
+		self.from_date = from_date
+		self.cutoff_date = cutoff_date
 		self.filters: List[Callable[[CovidCase], bool], ...] = list()
+		if self.cutoff_date is not None:
+			self.filters.append(lambda x: self.cutoff_date >= x.day)
+		if self.from_date is not None:
+			self.filters.append(lambda x: self.from_date <= x.day)
 		if self.province_filter is not None:
 			self.filters.append(lambda x: self.province_filter == x.province)
 		if self.age_filter is not None:

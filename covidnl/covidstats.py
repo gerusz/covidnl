@@ -1,28 +1,44 @@
 import datetime
 import getopt
 import sys
+from typing import Union, Dict, Any
 
 import matplotlib.pyplot as plt
 
 from covidnl.model import CovidCase, CaseFilter
 from covidnl.plotting import plot_daily_cases, plot_stacked_cases, daily_cases_common, plot_r_rate, plot_cumulative_cases
 from covidnl.stats import count_cumulative_cases, separate_stacks, calculate_r_rate_data, get_cases_per_day
-from covidnl.util import validate_province, validate_cutoff, validate_smoothing_window, validate_stack, load_cases, print_help, validate_age_filter
+from covidnl.util import validate_province, validate_cutoff, validate_smoothing_window, validate_stack, load_cases, print_help, validate_age_filter, \
+	validate_date_filter
 
 
-def main(smoothing_window: int, case_filter: CaseFilter, cutoff_days: int = 3, stack=None, force_download: bool = False):
+def main(smoothing_window: int, case_filter_params: Dict[str, Any], stack=None, force_download: bool = False):
 	"""
 	The main function for the stat script. Downloads, processes, and displays the stats.
 	:param smoothing_window: The window for the trendline
-	:param case_filter: The case filter
-	:param cutoff_days: Cutoff days, ignore this many days from the end of the stats
+	:param case_filter_params: The case filter's parameters. Possible values: cutoff_days, date_filter, age_filter, province_filter
 	:param stack: The value to stack the daily trends by.
 	:param force_download: Whether the stats have to be downloaded even if they are relatively new.
 	:return: No return value.
 	"""
 	
 	cases = load_cases(force_download)
-	cutoff_day: datetime.date = CovidCase.file_date.date() - datetime.timedelta(days=cutoff_days)
+	
+	cutoff_day: datetime.date = CovidCase.file_date.date() - datetime.timedelta(days=case_filter_params.get("cutoff_days", 0))
+	print("Cutoff: {}".format(cutoff_day))
+	from_day: Union[None, datetime.date] = None
+	date_filter = case_filter_params.get("date_filter", None)
+	if isinstance(date_filter, datetime.date):
+		if date_filter > cutoff_day:
+			print("Start date for stats set after cutoff days, aborting. Pick a date before {}!".format(cutoff_day))
+			sys.exit(2)
+		from_day = date_filter_arg
+	elif isinstance(date_filter, datetime.timedelta):
+		from_day = cutoff_day - date_filter
+	if from_day is not None:
+		print("Showing only results after {}".format(from_day))
+	
+	case_filter = CaseFilter(case_filter_params.get("province_filter", None), case_filter_params.get("age_filter", None), from_day, cutoff_day)
 	
 	# Calculate the common stats
 	days, case_counts, cases_per_day, death_counts, deaths_per_day = get_cases_per_day(cases, cutoff_day, case_filter)
@@ -64,9 +80,10 @@ if __name__ == "__main__":
 	cutoff_days_arg = 3
 	stack_arg = None
 	age_filter_arg = None
+	date_filter_arg: Union[datetime.date, datetime.timedelta, None] = None
 	
 	try:
-		options, trailing_args = getopt.getopt(sys.argv[1:], "hfw:p:c:s:a:", ["help", "force", "window=", "province=", "cutoff=", "stack=", "age="])
+		options, trailing_args = getopt.getopt(sys.argv[1:], "hfw:p:c:s:a:d:", ["help", "force", "window=", "province=", "cutoff=", "stack=", "age=", "date="])
 		for option, value in options:
 			if option in ("-h", "--help"):
 				print_help()
@@ -83,6 +100,8 @@ if __name__ == "__main__":
 				stack_arg = validate_stack(value)
 			elif option in ("-a", "--age"):
 				age_filter_arg = validate_age_filter(value)
+			elif option in ("-d", "--date"):
+				date_filter_arg = validate_date_filter(value)
 	
 	except getopt.GetoptError:
 		print_help()
@@ -92,4 +111,8 @@ if __name__ == "__main__":
 		print("Can't stack by province with a province filter!")
 		sys.exit(2)
 	
-	main(smoothing_window_arg, CaseFilter(province_filter_arg, age_filter_arg), cutoff_days_arg, stack_arg, force_download_arg)
+	main(
+		smoothing_window_arg,
+		{"province_filter": province_filter_arg, "age_filter": age_filter_arg, "date_filter": date_filter_arg, "cutoff_days": cutoff_days_arg},
+		stack_arg,
+		force_download_arg)

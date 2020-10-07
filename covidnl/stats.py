@@ -147,12 +147,8 @@ def get_cases_per_day(
 	"""
 	cases_per_day: Dict[datetime.date, int] = dict()
 	deaths_per_day: Dict[datetime.date, int] = dict()
-	print("Cutoff: {}".format(cutoff_day))
 	for c_case in cases:
-		if c_case.day > cutoff_day:
-			# Skip recent values, those days are most likely incomplete.
-			continue
-		if not case_filter.filter(c_case):
+		if not case_filter.filter(c_case):  # Cutoff day also integrated in the filter
 			continue
 		cases_per_day[c_case.day] = cases_per_day.get(c_case.day, 0) + 1
 		if c_case.dead:
