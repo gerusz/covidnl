@@ -24,7 +24,8 @@ Short argument|Long argument|Value required?|Effect
 -p|--province|Yes (a Dutch province, by its Dutch name, see notes)|Filters the data to a certain province. If absent, countrywide stats are shown.
 -a|--age|Yes (an age range)|Filters the results by age. See notes for possible values.
 -c|--cutoff|Yes (integer, >=0)|Defines how many days should be cut off from the end. (Data comes in from the provinces with a delay, so the last few days are unreliable.) Default: 3.
--d|--date|Yes (a period or an ISO date)|Defines the start date, data before this date will be ignored. Caveat: it will probably wreck the R-rate graph. See below.
+-d|--date|Yes (a period or an ISO date)|Defines the start date, data before this date will be ignored. Caveat: it will probably wreck the R-rate graph. See notes for possible values.
+-z|--zoom|Yes (a period or an ISO date)|Defines the start date of the charts. Still uses data before that for trends, cumulative cases, R-values, etc... See notes for possible values.
 -s|--stack|Yes (age, sex, or province)|Instead of a simple daily case plot, plots a stacked area chart. Caveats: Smoothing is disabled (so the argument is irrelevant) and province stacking + province filtering doesn't work (for obvious reasons).
 
 ### Notes:
