@@ -84,7 +84,7 @@ def main(smoothing_window: int, case_filter_params: Dict[str, Any], stack=None, 
 	plt.subplot(224)
 	plot_r_rate(case_counts_used, cumulative_x, exponent_trendline, second_wave_trendline, second_wave_x)
 	plt.gcf().canvas.set_window_title("Covid 19 in " + ("the whole Netherlands" if case_filter.province_filter is None else case_filter.province_filter))
-	plt.subplots_adjust(hspace=0.35, wspace=0.25, left=0.07, right=0.95, top=0.95, bottom=0.07)
+	plt.subplots_adjust(hspace=0.35, wspace=0.25, left=0.07, right=0.95, top=0.95, bottom=0.09)
 	plt.show()
 
 
