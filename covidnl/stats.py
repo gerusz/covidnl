@@ -6,44 +6,60 @@ import numpy as np
 from covidnl.model import CovidCase, CaseFilter
 
 
-def calculate_smoothed_trends(case_counts: np.ndarray, death_counts: np.ndarray, smoothing_window: int) -> Tuple[np.ndarray, np.ndarray]:
+def calculate_smoothed_trends(
+		case_counts: np.ndarray,
+		death_counts: np.ndarray,
+		hosp_counts: np.ndarray,
+		smoothing_window: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 	"""
 	Calculates the smoothed trends with the given smoothing window
 	:param case_counts: Cases per day
 	:param death_counts: Deaths per day
+	:param hosp_counts: Hospitalizations per day
 	:param smoothing_window: How many days should the smoothing look behind
 	:return: A tuple of NumPy arrays: (smoothed_cases, smoothed_deaths)
 	"""
-	smoothed_cases: np.ndarray = np.zeros(len(case_counts))
-	smoothed_deaths: np.ndarray = np.zeros(len(case_counts))
-	for day_idx in range(smoothing_window, len(case_counts) + 1):
-		case_sum = sum(case_counts[day_idx - smoothing_window:day_idx:])
-		death_sum = sum(death_counts[day_idx - smoothing_window:day_idx:])
-		
-		smoothed_cases[day_idx - 1] = case_sum / smoothing_window
-		smoothed_deaths[day_idx - 1] = death_sum / smoothing_window
-	return smoothed_cases, smoothed_deaths
+	return smooth_data_line(case_counts, smoothing_window), smooth_data_line(death_counts, smoothing_window), smooth_data_line(hosp_counts, smoothing_window)
+
+
+def smooth_data_line(data_line: np.ndarray, smoothing_window: int) -> np.ndarray:
+	"""
+	Smooths a data line with the given smoothing window
+	:param data_line: The data line as a NumPy array
+	:param smoothing_window: The smoothing window, integer
+	:return: The smoothed data line as a NumPy array
+	"""
+	smoothed_data: np.ndarray = np.zeros(len(data_line))
+	for day_idx in range(smoothing_window, len(data_line) + 1):
+		sum_data = sum(data_line[day_idx - smoothing_window:day_idx:])
+		smoothed_data[day_idx - 1] = sum_data / smoothing_window
+	
+	return smoothed_data
 
 
 def count_cumulative_cases(
 		days: List[datetime.date],
 		cases_per_day: Dict[datetime.date, int],
-		deaths_per_day: Dict[datetime.date, int]) -> Tuple[List[int], List[int]]:
+		deaths_per_day: Dict[datetime.date, int],
+		hosp_per_day: Dict[datetime.date, int]) -> Tuple[List[int], List[int], List[int]]:
 	"""
 	Calculates the cumulative cases and deaths
 	:param days: The list of days with at least one case or death
 	:param cases_per_day: A dictionary of case counts indexed by days
 	:param deaths_per_day: A dictionary of death counts indexed by days
+	:param hosp_per_day: A dictionary of hospitalization counts indexed by days
 	:return: A tuple of lists containing the cumulative cases and cumulative deaths: (cumulative_cases, cumulative_deaths)
 	"""
-	cumulative_cases: List[int] = list()
-	cumulative_deaths: List[int] = list()
-	cumulative_cases.append(cases_per_day[days[0]])
-	cumulative_deaths.append(0)
+	return cumulate_data(days, cases_per_day), cumulate_data(days, deaths_per_day), cumulate_data(days, hosp_per_day)
+
+
+def cumulate_data(days: List[datetime.date], data: Dict[datetime.date, int]) -> List[int]:
+	cumulative_data: List[int] = list()
+	cumulative_data.append(data.get(days[0], 0))
 	for day in days[1::]:
-		cumulative_cases.append(cumulative_cases[-1] + cases_per_day.get(day, 0))  # Again, my world-famous optimism.
-		cumulative_deaths.append(cumulative_deaths[-1] + deaths_per_day.get(day, 0))
-	return cumulative_cases, cumulative_deaths
+		cumulative_data.append(cumulative_data[-1] + data.get(day, 0))  # Again, my world-famous optimism.
+	
+	return cumulative_data
 
 
 def separate_stacks(
@@ -94,7 +110,18 @@ def separate_stacks(
 	return stack_labels, stacked_cases_per_day
 
 
-def calculate_r_rate_data(case_counts: np.ndarray, cumulative_cases: List[int]) -> Tuple[List[int], np.ndarray, List[float], List[int], List[float]]:
+def calculate_r_estimation(cases: np.ndarray) -> np.ndarray:
+	five_day_avg = smooth_data_line(cases, 5)
+	ten_day_avg = smooth_data_line(cases, 15)
+	r_estimates = np.zeros(len(cases))
+	
+	for day_idx in range(15, len(cases), 1):
+		r_estimates[day_idx] = five_day_avg[day_idx] / ten_day_avg[day_idx]
+	
+	return smooth_data_line(r_estimates, 5)
+
+
+def calculate_r_rate_data_old_style(case_counts: np.ndarray, cumulative_cases: List[int]) -> Tuple[List[int], np.ndarray, List[float], List[int], List[float]]:
 	"""
 	Calculates the data for the cumulative case - daily cases chart
 	:param case_counts: The case counts in a NumPy array
@@ -132,6 +159,8 @@ def get_cases_per_day(
 	np.ndarray,
 	Dict[datetime.date, int],
 	np.ndarray,
+	Dict[datetime.date, int],
+	np.ndarray,
 	Dict[datetime.date, int]]:
 	"""
 	Calculates the cases per day
@@ -144,23 +173,31 @@ def get_cases_per_day(
 		cases_per_day: a dictionary of case counts indexed by the days
 		death_counts: a NumPy array with the raw death counts
 		deaths_per_day: a dictionary of death counts indexed by the days
+		hosp_counts: a NumPy array with the raw hospitalization counts
+		hosp_per_day: a dictionary of death counts indexed by the days
 	"""
 	cases_per_day: Dict[datetime.date, int] = dict()
 	deaths_per_day: Dict[datetime.date, int] = dict()
+	hosp_per_day: Dict[datetime.date, int] = dict()
 	for c_case in cases:
 		if not case_filter.filter(c_case):  # Cutoff day also integrated in the filter
 			continue
 		cases_per_day[c_case.day] = cases_per_day.get(c_case.day, 0) + 1
 		if c_case.dead:
 			deaths_per_day[c_case.day] = deaths_per_day.get(c_case.day, 0) + 1
+		if c_case.hospitalized:
+			hosp_per_day[c_case.day] = hosp_per_day.get(c_case.day, 0) + 1
 	days: List[datetime.date] = list(cases_per_day.keys())
 	days.sort()
 	for day in days:
 		if day not in deaths_per_day.keys():
 			deaths_per_day[day] = 0
+		if day not in hosp_per_day.keys():
+			hosp_per_day[day] = 0
 	case_counts: np.ndarray = np.array(tuple(cases_per_day[day] for day in days))
 	death_counts: np.ndarray = np.array(tuple(deaths_per_day[day] for day in days))
-	return days, case_counts, cases_per_day, death_counts, deaths_per_day
+	hosp_counts: np.ndarray = np.array(tuple(hosp_per_day[day] for day in days))
+	return days, case_counts, cases_per_day, death_counts, deaths_per_day, hosp_counts, hosp_per_day
 
 
 provinces: Tuple[str, ...] = (

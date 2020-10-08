@@ -6,8 +6,8 @@ from typing import Union, Dict, Any
 import matplotlib.pyplot as plt
 
 from covidnl.model import CovidCase, CaseFilter
-from covidnl.plotting import plot_daily_cases, plot_stacked_cases, daily_cases_common, plot_r_rate, plot_cumulative_cases
-from covidnl.stats import count_cumulative_cases, separate_stacks, calculate_r_rate_data, get_cases_per_day
+from covidnl.plotting import plot_daily_cases, plot_stacked_cases, daily_cases_common, plot_cumulative_cases, plot_r_rate
+from covidnl.stats import count_cumulative_cases, separate_stacks, get_cases_per_day, calculate_r_estimation
 from covidnl.util import validate_province, validate_cutoff, validate_smoothing_window, validate_stack, load_cases, print_help, validate_age_filter, \
 	validate_date_filter
 
@@ -57,9 +57,10 @@ def main(smoothing_window: int, case_filter_params: Dict[str, Any], stack=None, 
 	case_filter = CaseFilter(case_filter_params.get("province_filter", None), case_filter_params.get("age_filter", None), from_day, cutoff_day)
 	
 	# Calculate the common stats
-	days, case_counts, cases_per_day, death_counts, deaths_per_day = get_cases_per_day(cases, cutoff_day, case_filter)
-	cumulative_cases, cumulative_deaths = count_cumulative_cases(days, cases_per_day, deaths_per_day)
-	cumulative_x, case_counts_used, exponent_trendline, second_wave_x, second_wave_trendline, = calculate_r_rate_data(case_counts, cumulative_cases)
+	days, case_counts, cases_per_day, death_counts, deaths_per_day, hosp_counts, hosp_per_day = get_cases_per_day(cases, cutoff_day, case_filter)
+	cumulative_cases, cumulative_deaths, cumulative_hosp = count_cumulative_cases(days, cases_per_day, deaths_per_day, hosp_per_day)
+	# cumulative_x, case_counts_used, exponent_trendline, second_wave_x, second_wave_trendline, = calculate_r_rate_data_old_style(case_counts, cumulative_cases)
+	r_rates = calculate_r_estimation(case_counts)
 	
 	# BMH has almost enough colors for the age and the province stacking, and I'm too lazy to make my own palettes, so...
 	plt.style.use("bmh")
@@ -70,7 +71,7 @@ def main(smoothing_window: int, case_filter_params: Dict[str, Any], stack=None, 
 	# Daily cases plot
 	plt.subplot(211)
 	if stack is None:
-		plot_daily_cases(days, case_counts, death_counts, smoothing_window, zoom_to)
+		plot_daily_cases(days, case_counts, death_counts, hosp_counts, smoothing_window, zoom_to)
 	else:
 		stack_labels, stacked_cases_per_day = separate_stacks(cases, days, cutoff_day, stack, case_filter)
 		plot_stacked_cases(days, stacked_cases_per_day, stack_labels, stack, zoom_to)
@@ -78,11 +79,12 @@ def main(smoothing_window: int, case_filter_params: Dict[str, Any], stack=None, 
 	
 	# Cumulative cases plot
 	plt.subplot(223)
-	plot_cumulative_cases(days, cumulative_cases, cumulative_deaths, zoom_to)
+	plot_cumulative_cases(days, cumulative_cases, cumulative_deaths, cumulative_hosp, zoom_to)
 	
 	# Reproduction rate plot
 	plt.subplot(224)
-	plot_r_rate(case_counts_used, cumulative_x, exponent_trendline, second_wave_trendline, second_wave_x)
+	# plot_r_rate_old_style(case_counts_used, cumulative_x, exponent_trendline, second_wave_trendline, second_wave_x)
+	plot_r_rate(days, r_rates, zoom_to)
 	plt.gcf().canvas.set_window_title("Covid 19 in " + ("the whole Netherlands" if case_filter.province_filter is None else case_filter.province_filter))
 	plt.subplots_adjust(hspace=0.35, wspace=0.25, left=0.07, right=0.95, top=0.95, bottom=0.09)
 	plt.show()
