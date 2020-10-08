@@ -1,5 +1,5 @@
 import datetime
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import numpy as np
 from matplotlib import pyplot as plt, ticker as ticker
@@ -7,20 +7,36 @@ from matplotlib import pyplot as plt, ticker as ticker
 from covidnl.stats import calculate_smoothed_trends
 
 
-def plot_daily_cases(days: List[datetime.date], case_counts: np.ndarray, death_counts: np.ndarray, smoothing_window: int):
-	plt.plot(days, case_counts, label="Daily cases")
-	plt.plot(days, death_counts, label="Of them dead")
+def plot_daily_cases(days: List[datetime.date], case_counts: np.ndarray, death_counts: np.ndarray, smoothing_window: int,
+                     start_date: Union[datetime.date, None] = None):
+	start_idx = zoom_start_idx(days, start_date)
+	
+	plt.plot(days[start_idx::], case_counts[start_idx::], label="Daily cases")
+	plt.plot(days[start_idx::], death_counts[start_idx::], label="Of them dead")
 	if smoothing_window != 0:
 		smoothed_cases, smoothed_deaths = calculate_smoothed_trends(case_counts, death_counts, smoothing_window)
-		plt.plot(days, smoothed_cases, label="Trend ({} day avg.)".format(smoothing_window))
-		plt.plot(days, smoothed_deaths, label="Death trend ({} day avg.)".format(smoothing_window))
+		plt.plot(days[start_idx::], smoothed_cases[start_idx::], label="Trend ({} day avg.)".format(smoothing_window))
+		plt.plot(days[start_idx::], smoothed_deaths[start_idx::], label="Death trend ({} day avg.)".format(smoothing_window))
 		plt.title("Daily cases and trend (smoothing window: {})".format(smoothing_window))
 	else:
 		plt.title("Daily cases")
 
 
-def plot_stacked_cases(days: List[datetime.date], stacked_cases_per_day: np.ndarray, stack_labels: Tuple, stack_by: str):
-	plt.stackplot(days, stacked_cases_per_day, labels=stack_labels)
+def zoom_start_idx(days, start_date):
+	start_idx = 0
+	if start_date is not None:
+		for idx, day in enumerate(days):
+			if day >= start_date:
+				start_idx = idx
+				break
+	return start_idx
+
+
+def plot_stacked_cases(days: List[datetime.date], stacked_cases_per_day: np.ndarray, stack_labels: Tuple, stack_by: str,
+                       start_date: Union[datetime.date, None] = None):
+	start_idx = zoom_start_idx(days, start_date)
+	
+	plt.stackplot(days[start_idx::], stacked_cases_per_day[:, start_idx:], labels=stack_labels)
 	plt.title("Daily cases stacked by {}".format(stack_by))
 
 
@@ -51,9 +67,11 @@ def plot_r_rate(case_counts_used, cumulative_x, exponent_trendline, second_wave_
 	plt.margins(x=0)
 
 
-def plot_cumulative_cases(days, cumulative_cases, cumulative_deaths):
-	plt.plot(days, cumulative_cases, label="Cases")
-	plt.plot(days, cumulative_deaths, label="Deaths")
+def plot_cumulative_cases(days, cumulative_cases, cumulative_deaths, start_date: Union[datetime.date, None] = None):
+	start_idx = zoom_start_idx(days, start_date)
+	
+	plt.plot(days[start_idx::], cumulative_cases[start_idx::], label="Cases")
+	plt.plot(days[start_idx::], cumulative_deaths[start_idx::], label="Deaths")
 	plt.yscale("log")
 	plt.title("Cumulative cases (log)")
 	plt.xlabel("Date")

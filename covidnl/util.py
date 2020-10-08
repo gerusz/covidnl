@@ -96,7 +96,7 @@ def validate_stack(arg_value: str) -> str:
 	sys.exit(2)
 
 
-def validate_date_filter(arg_value: str) -> Union[datetime.date, datetime.timedelta]:
+def validate_date_filter(arg_value: str, relative_to: Union[datetime.date, None] = None) -> Union[datetime.date, datetime.timedelta]:
 	date_as_duration = re.compile("(?P<num>[1-9]\\d*)\\s*(?P<unit>[dDwWmMyY])")  # Now that Y there... _that's_ my trademark optimism!
 	date_as_iso = re.compile("202\\d-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])")
 	
@@ -111,24 +111,25 @@ def validate_date_filter(arg_value: str) -> Union[datetime.date, datetime.timede
 		if duration_match:
 			num = int(duration_match.group("num"))
 			unit = duration_match.group("unit").lower()
-			today = datetime.date.today()
+			if relative_to is None:
+				relative_to = datetime.date.today()
 			if unit == "y":
-				new_year = today.year - num
+				new_year = relative_to.year - num
 				# Edge case, symbolizing my undying optimism about the pandemic response... see you in 2024, bug that I just prevented
 				# You can probably still crash it if you target the year 1900, but that's just stupid.
-				if today.month == 2 and today.day == 29 and new_year % 4 > 0:
-					return today - today.replace(year=new_year, day=28)
-				return today - today.replace(year=new_year)
+				if relative_to.month == 2 and relative_to.day == 29 and new_year % 4 > 0:
+					return relative_to.replace(year=new_year, day=28)
+				return relative_to.replace(year=new_year)
 			elif unit == "m":
-				today_m_zero_indexed = today.month - 1
+				today_m_zero_indexed = relative_to.month - 1
 				if num >= today_m_zero_indexed:
-					new_year = today.year - (num // 12 + 1)
+					new_year = relative_to.year - (num // 12 + 1)
 					new_month = 13 - (num % 12)
 				else:
-					new_year = today.year
-					new_month = today.month - num
+					new_year = relative_to.year
+					new_month = relative_to.month - num
 				try:
-					return today - today.replace(year=new_year, month=new_month)
+					return relative_to.replace(year=new_year, month=new_month)
 				except ValueError:
 					# Issue that this fixes: apparently today's day is greater than the number of days in the target month. (Or the same leap year issue as above.)
 					return datetime.timedelta(days=(365.25 / 12) * num)
@@ -203,4 +204,4 @@ def validate_age_filter(arg_value: str) -> Tuple[int, Union[int, None]]:
 
 def print_help():
 	print(
-		"Usage: covidstats.py [(-w|--window) <trend smoothing window>] [(-p|--province) <province>] [(-a|--age) <age filter>] [(-c|--cutoff) <cutoff days>] [(-d|--date) start date or offset before the cutoff date] [(-s|--stack) (sex|age|province)] [(-f|--force)]")
+		"Usage: covidstats.py [(-w|--window) <trend smoothing window>] [(-p|--province) <province>] [(-a|--age) <age filter>] [(-c|--cutoff) <cutoff days>] [(-d|--date) start date or offset before the cutoff date] [(-z|--zoom) plotting start date or offset before the cutoff date] [(-s|--stack) (sex|age|province)] [(-f|--force)]")
