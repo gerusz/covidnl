@@ -39,9 +39,9 @@ def smooth_data_line(data_line: np.ndarray, smoothing_window: int) -> np.ndarray
 
 def count_cumulative_cases(
 		days: List[datetime.date],
-		cases_per_day: Dict[datetime.date, int],
-		deaths_per_day: Dict[datetime.date, int],
-		hosp_per_day: Dict[datetime.date, int]) -> Tuple[List[int], List[int], List[int]]:
+		cases_per_day: Dict[datetime.date, float],
+		deaths_per_day: Dict[datetime.date, float],
+		hosp_per_day: Dict[datetime.date, float]) -> Tuple[List[float], List[float], List[float]]:
 	"""
 	Calculates the cumulative cases and deaths
 	:param days: The list of days with at least one case or death
@@ -53,7 +53,7 @@ def count_cumulative_cases(
 	return cumulate_data(days, cases_per_day), cumulate_data(days, deaths_per_day), cumulate_data(days, hosp_per_day)
 
 
-def cumulate_data(days: List[datetime.date], data: Dict[datetime.date, int]) -> List[int]:
+def cumulate_data(days: List[datetime.date], data: Dict[datetime.date, float]) -> List[float]:
 	cumulative_data: List[int] = list()
 	cumulative_data.append(data.get(days[0], 0))
 	for day in days[1::]:
@@ -62,23 +62,22 @@ def cumulate_data(days: List[datetime.date], data: Dict[datetime.date, int]) -> 
 	return cumulative_data
 
 
-def separate_stacks(
-		cases: List[CovidCase],
-		days: List[datetime.date],
-		cutoff_day: datetime.date,
-		stack: str,
-		case_filter: CaseFilter) -> Tuple[Tuple[str, ...], np.ndarray]:
+def separate_stacks(cases: List[CovidCase], days: List[datetime.date], stack: str, case_filter: CaseFilter, per_capita: bool) -> Tuple[
+	Tuple[str, ...], np.ndarray]:
 	"""
 	Returns the data represented as separate data lines by the stacking category
 	:param cases: A list of all CovidCase cases
 	:param days: A list of days (datetime.date)
-	:param cutoff_day: A cutoff date (datetime.date)
 	:param stack: The stacking parameter. String, one of "province", "sex", or "age".
 	:param case_filter: A CaseFilter object
+	:param per_capita: Whether the stacking should be done per-capita or total. Only works with province stacking.
 	:return: A tuple consisting of a list of stack labels (strings) and a 2D NumPy array, first dimension: stack, second dimension: day.
 	"""
+	
 	if stack == "province":
-		stack_labels: Tuple[str, ...] = provinces
+		province_names = list(provinces.keys())
+		province_names.sort(key=lambda prov: provinces.get(prov), reverse=True)
+		stack_labels: Tuple[str, ...] = tuple(province_names)
 	elif stack == "sex":
 		stack_labels = ("Male", "Female")
 	else:
@@ -95,30 +94,49 @@ def separate_stacks(
 			"80-89",
 			"90+"
 		)
-	stacked_cases_per_day: np.ndarray = np.zeros((len(stack_labels), len(days)), dtype=int)
+	stacked_cases_per_day: np.ndarray = np.zeros((len(stack_labels), len(days)), dtype=float)
 	for c_case in cases:
-		if c_case.day > cutoff_day:
-			# Skip recent values, those days are most likely incomplete.
-			continue
-		if not case_filter.filter(c_case):
+		if not case_filter.filter(c_case):  # Cutoff day also integrated in the filter
 			continue
 		stack_key = c_case.province if stack == "province" else (c_case.sex if stack == "sex" else c_case.age)
 		if stack_key in stack_labels:
 			stack_idx = stack_labels.index(stack_key)
 			day_idx = days.index(c_case.day)
 			stacked_cases_per_day[stack_idx][day_idx] += 1
+	if per_capita:
+		total_population = sum(provinces.values()) / 100000
+		for day_idx in range(len(days)):
+			normalize_to = sum(stacked_cases_per_day[:, day_idx]) / total_population
+			for (p_idx, province) in enumerate(stack_labels):
+				stacked_cases_per_day[p_idx, day_idx] = stacked_cases_per_day[p_idx, day_idx] / (provinces[province] / 100000)
+			normalization_factor = normalize_to / sum(stacked_cases_per_day[:, day_idx])
+			for p_idx in range(len(stack_labels)):
+				stacked_cases_per_day[p_idx, day_idx] = stacked_cases_per_day[p_idx, day_idx] * normalization_factor
+	
 	return stack_labels, stacked_cases_per_day
 
 
-def calculate_r_estimation(cases: np.ndarray) -> np.ndarray:
+def calculate_r_estimation(cases: np.ndarray, per_capita: bool) -> Tuple[np.ndarray, int]:
+	"""
+	Calculates the R-rates and returns both the r-rate data line and an integer describing how many days should be ignored from the beginning
+	:param cases: The cases in an array
+	:param per_capita: Whether the cases are given as per-capita metrics. Used for the "ignore" calculation
+	:return: The R-rates and the days to ignore (=when the fifteen-day average is less than 150)
+	"""
 	five_day_avg = smooth_data_line(cases, 5)
-	ten_day_avg = smooth_data_line(cases, 15)
+	fifteen_day_avg = smooth_data_line(cases, 15)
 	r_estimates = np.zeros(len(cases))
+	total_population = sum(provinces.values()) / 100000 if per_capita else 1
+	
+	ignore: int = 15
+	for ignore in range(len(fifteen_day_avg)):
+		if fifteen_day_avg[ignore] >= 150 / total_population:
+			break
 	
 	for day_idx in range(15, len(cases), 1):
-		r_estimates[day_idx] = five_day_avg[day_idx] / ten_day_avg[day_idx]
+		r_estimates[day_idx] = five_day_avg[day_idx] / fifteen_day_avg[day_idx]
 	
-	return smooth_data_line(r_estimates, 5)
+	return smooth_data_line(r_estimates, 5), ignore
 
 
 def calculate_r_rate_data_old_style(case_counts: np.ndarray, cumulative_cases: List[int]) -> Tuple[List[int], np.ndarray, List[float], List[int], List[float]]:
@@ -151,10 +169,7 @@ def calculate_r_rate_data_old_style(case_counts: np.ndarray, cumulative_cases: L
 	return cumulative_x, case_counts_used, exponent_trendline, second_wave_x, second_wave_trendline
 
 
-def get_cases_per_day(
-		cases: List[CovidCase],
-		cutoff_day: datetime.date,
-		case_filter: CaseFilter) -> Tuple[
+def get_cases_per_day(cases: List[CovidCase], case_filter: CaseFilter, per_capita: bool) -> Tuple[
 	List[datetime.date],
 	np.ndarray,
 	Dict[datetime.date, int],
@@ -165,8 +180,8 @@ def get_cases_per_day(
 	"""
 	Calculates the cases per day
 	:param cases: All cases, List[CovidCase]
-	:param cutoff_day: The day after which the cases are ignored, datetime.date
 	:param case_filter: The case filter, a CaseFilter
+	:param per_capita: Whether the results should be counted per 100k person.
 	:return: A Tuple consisting of:
 		days: a list of all days with at least one case
 		case_counts: a NumPy array with the raw case counts
@@ -176,6 +191,7 @@ def get_cases_per_day(
 		hosp_counts: a NumPy array with the raw hospitalization counts
 		hosp_per_day: a dictionary of death counts indexed by the days
 	"""
+	total_population = sum(provinces.values()) / 100000 if per_capita else 1
 	cases_per_day: Dict[datetime.date, int] = dict()
 	deaths_per_day: Dict[datetime.date, int] = dict()
 	hosp_per_day: Dict[datetime.date, int] = dict()
@@ -194,22 +210,26 @@ def get_cases_per_day(
 			deaths_per_day[day] = 0
 		if day not in hosp_per_day.keys():
 			hosp_per_day[day] = 0
+		cases_per_day[day] /= total_population
+		deaths_per_day[day] /= total_population
+		hosp_per_day[day] /= total_population
 	case_counts: np.ndarray = np.array(tuple(cases_per_day[day] for day in days))
 	death_counts: np.ndarray = np.array(tuple(deaths_per_day[day] for day in days))
 	hosp_counts: np.ndarray = np.array(tuple(hosp_per_day[day] for day in days))
 	return days, case_counts, cases_per_day, death_counts, deaths_per_day, hosp_counts, hosp_per_day
 
 
-provinces: Tuple[str, ...] = (
-	"Groningen",
-	"Friesland",
-	"Drenthe",
-	"Overijssel",
-	"Flevoland",
-	"Gelderland",
-	"Utrecht",
-	"Noord-Holland",
-	"Zuid-Holland",
-	"Zeeland",
-	"Noord-Brabant",
-	"Limburg")
+provinces: Dict[str, int] = {
+	"Zuid-Holland": 3708696,
+	"Noord-Holland": 2879527,
+	"Noord-Brabant": 2562955,
+	"Gelderland": 2085952,
+	"Utrecht": 1354834,
+	"Overijssel": 1162406,
+	"Limburg": 1117201,
+	"Friesland": 649957,
+	"Groningen": 585866,
+	"Drenthe": 493682,
+	"Flevoland": 423021,
+	"Zeeland": 383488,
+}

@@ -13,21 +13,33 @@ def plot_daily_cases(
 		death_counts: np.ndarray,
 		hosp_counts: np.ndarray,
 		smoothing_window: int,
-		start_date: Union[datetime.date, None] = None):
+		start_date: Union[datetime.date, None] = None
+):
 	start_idx = zoom_start_idx(days, start_date)
 	
-	plt.plot(days[start_idx::], case_counts[start_idx::], label="Daily cases")
-	plt.plot(days[start_idx::], death_counts[start_idx::], label="Of them dead")
-	plt.plot(days[start_idx::], hosp_counts[start_idx::], label="Of them hospitalized")
 	if smoothing_window != 0:
 		smoothed_cases, smoothed_deaths, smoothed_hosp = calculate_smoothed_trends(case_counts, death_counts, hosp_counts, smoothing_window)
 		shift = smoothing_window // 2
-		plt.plot(days[start_idx:-shift:], smoothed_cases[start_idx + shift::], label="Trend ({} day avg.)".format(smoothing_window))
-		plt.plot(days[start_idx:-shift:], smoothed_deaths[start_idx + shift::], label="Death trend ({} day avg.)".format(smoothing_window))
-		plt.plot(days[start_idx:-shift:], smoothed_hosp[start_idx + shift::], label="Hospitalization trend ({} day avg.)".format(smoothing_window))
 		plt.title("Daily cases and trend (smoothing window: {})".format(smoothing_window))
 	else:
 		plt.title("Daily cases")
+	
+	plt.plot(days[start_idx::], case_counts[start_idx::], label="Daily cases")
+	if smoothing_window != 0:
+		# If the above condition is true, the variables are set.
+		# noinspection PyUnboundLocalVariable
+		plt.plot(days[start_idx:-shift:], smoothed_cases[start_idx + shift::], label="Trend ({} day avg.)".format(smoothing_window))
+	plt.plot(days[start_idx::], death_counts[start_idx::], label="Deaths")
+	if smoothing_window != 0:
+		# If the above condition is true, the variables are set.
+		# noinspection PyUnboundLocalVariable
+		plt.plot(days[start_idx:-shift:], smoothed_deaths[start_idx + shift::], label="Death trend ({} day avg.)".format(smoothing_window))
+	plt.plot(days[start_idx::], hosp_counts[start_idx::], label="Hospitalizations")
+	if smoothing_window != 0:
+		# If the above condition is true, the variables are set.
+		# noinspection PyUnboundLocalVariable
+		plt.plot(days[start_idx:-shift:], smoothed_hosp[start_idx + shift::], label="Hospitalization trend ({} day avg.)".format(smoothing_window))
+	print("Daily cases plotted.")
 
 
 def zoom_start_idx(days, start_date):
@@ -50,20 +62,26 @@ def plot_stacked_cases(
 	
 	plt.stackplot(days[start_idx::], stacked_cases_per_day[:, start_idx:], labels=stack_labels)
 	plt.title("Daily cases stacked by {}".format(stack_by))
+	print("Stacked cases plotted.")
 
 
-def daily_cases_common():
+def daily_cases_common(per_capita: bool = False):
 	plt.xlabel("Date")
 	plt.xticks(rotation=90)
 	x_axis = plt.gcf().axes[0].get_xaxis()
 	y_axis = plt.gcf().axes[0].get_yaxis()
 	x_axis.set_major_locator(ticker.MultipleLocator(7))
 	x_axis.set_minor_locator(ticker.AutoMinorLocator(7))
-	y_axis.set_major_locator(ticker.MultipleLocator(200))
-	y_axis.set_minor_locator(ticker.AutoMinorLocator(4))
-	plt.ylabel("Cases")
+	if per_capita:
+		y_axis.set_major_locator(ticker.MultipleLocator(1))
+		y_axis.set_minor_locator(ticker.AutoMinorLocator(4))
+	else:
+		y_axis.set_major_locator(ticker.MultipleLocator(200))
+		y_axis.set_minor_locator(ticker.AutoMinorLocator(4))
+	plt.ylabel("Cases" + " per capita" if per_capita else "")
 	plt.legend(loc='upper left')
 	plt.margins(x=0)
+	print("Common stuff set for daily cases.")
 
 
 def plot_r_rate_old_style(case_counts_used, cumulative_x, exponent_trendline, second_wave_trendline, second_wave_x):
@@ -92,9 +110,11 @@ def plot_r_rate(days: List[datetime.date], r_rates: np.ndarray, start_date: Unio
 	plt.margins(x=0)
 	plt.xticks(rotation=30)
 	x_axis = plt.gcf().axes[2].get_xaxis()
-	major_tick_weekly = (days[-1] - days[start_idx] <= datetime.timedelta(days=120))
+	time_span: datetime.timedelta = days[-1] - days[start_idx]
+	major_tick_weekly = (time_span <= datetime.timedelta(days=120))
 	x_axis.set_major_locator(ticker.MultipleLocator(7 if major_tick_weekly else 28))
 	x_axis.set_minor_locator(ticker.AutoMinorLocator(7 if major_tick_weekly else 4))
+	print("R-rate plotted.")
 
 
 def plot_cumulative_cases(
@@ -125,3 +145,4 @@ def plot_cumulative_cases(
 	plt.xticks(rotation=30)
 	plt.legend()
 	plt.margins(x=0)
+	print("Cumulative cases plotted.")

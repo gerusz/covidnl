@@ -22,7 +22,7 @@ def validate_province(arg_value: str) -> str:
 	:param arg_value: The input value
 	:return: The province value. Capitalization is corrected, dashes are added when necessary, etc...
 	"""
-	if arg_value in provinces:
+	if arg_value in provinces.keys():
 		return arg_value
 	elif arg_value.lower() == "fryslân":
 		return "Friesland"
@@ -30,13 +30,13 @@ def validate_province(arg_value: str) -> str:
 	else:
 		# Case correction and such
 		p = re.compile("\\W")
-		for province in provinces:
+		for province in provinces.keys():
 			if p.sub("", province).lower() == p.sub("", arg_value).lower():
 				return province
 	# If the program got here, the argument couldn't be matched to any province
 	print("{} is not a valid Dutch province name.".format(arg_value))
 	print("The acceptable values are:")
-	print(provinces, sep=", ")
+	print(provinces.keys(), sep=", ")
 	sys.exit(2)
 
 
@@ -204,4 +204,7 @@ def validate_age_filter(arg_value: str) -> Tuple[int, Union[int, None]]:
 
 def print_help():
 	print(
-		"Usage: covidstats.py [(-w|--window) <trend smoothing window>] [(-p|--province) <province>] [(-a|--age) <age filter>] [(-c|--cutoff) <cutoff days>] [(-d|--date) start date or offset before the cutoff date] [(-z|--zoom) plotting start date or offset before the cutoff date] [(-s|--stack) (sex|age|province)] [(-f|--force)]")
+		"Usage:\n\t\t covidstats.py [(-w|--window) <trend smoothing window>] [(-p|--province) <province>] [(-a|--age) <age filter>] [(-c|--cutoff) <cutoff days>] [(-d|--date) start date or offset before the cutoff date] [(-z|--zoom) plotting start date or offset before the cutoff date] [(-s|--stack) (sex|age|province)] [(-f|--force)]")
+	print("\tOr:\tcovidstats.py config_file (absolute path or filename in the config directory ({}))".format(os.path.abspath("config")))
+	print(
+		"\tOr:\tcovidstats.py for launching with the configuration in config/default.json if it exists, or the default config if it doesn't (and write the default config to default.json)")

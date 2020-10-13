@@ -14,7 +14,19 @@ The file is [found here](https://data.rivm.nl/covid-19/COVID-19_casus_landelijk.
 
 # How to use it?
 
-The best way to run it is to run covidstats.py with some launch arguments. They are all optional, by default the data will show countrywide stats excluding the last 3 days, and a trendline with a 7-day smoothing window. The arguments are:
+covidstats.py can be ran in three ways:
+
+1. No arguments: the launch arguments will be loaded from ./config/default.json if it exists.
+
+    If it doesn't, the file will be created with the default settings (countrywide stats, 7-day cutoff, 7-day smoothing window) and the program will run with those configurations.
+2. A single argument not starting with a hyphen: the argument will be interpreted as the config file to be used.
+
+    If the file is a .json file inside the config folder, both "config/" and ".json" are optional.
+    Otherwise, an absolute path to the file is required.
+    
+3. Custom launch config: the app can be launched with multiple arguments, see below. 
+
+The arguments are:
 
 Short argument|Long argument|Value required?|Effect
 ---|---|---|---
@@ -27,6 +39,7 @@ Short argument|Long argument|Value required?|Effect
 -d|--date|Yes (a period or an ISO date)|Defines the start date, data before this date will be ignored. Caveat: it will probably wreck the R-rate graph. See notes for possible values.
 -z|--zoom|Yes (a period or an ISO date)|Defines the start date of the charts. Still uses data before that for trends, cumulative cases, R-values, etc... See notes for possible values.
 -s|--stack|Yes (age, sex, or province)|Instead of a simple daily case plot, plots a stacked area chart. Caveats: Smoothing is disabled (so the argument is irrelevant) and province stacking + province filtering doesn't work (for obvious reasons).
+-r|--ratio|No|The numbers will be shown as cases/100 000 person instead of the raw case counts.
 
 ### Notes:
 
