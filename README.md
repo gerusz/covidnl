@@ -6,9 +6,9 @@ This little tool here downloads the latest Dutch SARS-CoV-2019 stats from RIVM a
 
 The charts are:
 
-* Top left: daily new cases, with a trendline (that is on by default and uses a 7-day sliding average) on a linear scale
-* Top right: cumulative cases on a logarithmic scale
-* Bottom: cumulative cases and daily cases charted on a log-log scale. A downwards trend shows a <1 reproduction rate.
+* Top: daily new cases, with a trendline (that is on by default and uses a 7-day sliding average) on a linear scale
+* Bottom left: cumulative cases on a logarithmic scale
+* Bottom right: approximate r-rate chart. Blue means the pandemic is under control, red means it isn't.
 
 The file is [found here](https://data.rivm.nl/covid-19/COVID-19_casus_landelijk.json). Warning, it's a 30 MB JSON file (that's going to be fatter the more the govt. botches the pandemic response) so try to open it with a sane text editor. (That is, not notepad.)
 
