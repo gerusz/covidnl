@@ -28,18 +28,18 @@ covidstats.py can be ran in three ways:
 
 The arguments are:
 
-Short argument|Long argument|Value required?|Effect
----|---|---|---
--h|--help|No|Prints this in a more concise format
--f|--force|No|Forces the script to redownload the data even if it's less than an hour old
--w|--window|Yes (integer, \>1 or =0)|\>1: introduces a smoothing window and a trendline on the daily case chart (in orange). 0: disables the trendline. Default: 7.
--p|--province|Yes (a Dutch province, by its Dutch name, see notes)|Filters the data to a certain province. If absent, countrywide stats are shown.
--a|--age|Yes (an age range)|Filters the results by age. See notes for possible values.
--c|--cutoff|Yes (integer, >=0)|Defines how many days should be cut off from the end. (Data comes in from the provinces with a delay, so the last few days are unreliable.) Default: 3.
--d|--date|Yes (a period or an ISO date)|Defines the start date, data before this date will be ignored. Caveat: it will probably wreck the R-rate graph. See notes for possible values.
--z|--zoom|Yes (a period or an ISO date)|Defines the start date of the charts. Still uses data before that for trends, cumulative cases, R-values, etc... See notes for possible values.
--s|--stack|Yes (age, sex, or province)|Instead of a simple daily case plot, plots a stacked area chart. Caveats: Smoothing is disabled (so the argument is irrelevant) and province stacking + province filtering doesn't work (for obvious reasons).
--r|--ratio|No|The numbers will be shown as cases/100 000 person instead of the raw case counts.
+Short argument|Long argument|Field in a config JSON|Value required?|Effect
+---|---|---|---|---
+-h|--help|n/a|No|Prints this in a more concise format
+-f|--force|force|No (boolean in a json)|Forces the script to redownload the data even if it's less than an hour old
+-w|--window|smoothing_window|Yes (integer, \>1 or =0)|\>1: introduces a smoothing window and a trendline on the daily case chart (in orange). 0: disables the trendline. Default: 7.
+-p|--province|filter_params.province_filter|Yes (a Dutch province, by its Dutch name, see notes)|Filters the data to a certain province. If absent, countrywide stats are shown.
+-a|--age|filter_params.age_filter|Yes (an age range)|Filters the results by age. See notes for possible values.
+-c|--cutoff|filter_params.cutoff_days|Yes (integer, >=0)|Defines how many days should be cut off from the end. (Data comes in from the provinces with a delay, so the last few days are unreliable.) Default: 3.
+-d|--date|filter_params.date_filter|Yes (a period or an ISO date)|Defines the start date, data before this date will be ignored. Caveat: it will probably wreck the R-rate graph. See notes for possible values.
+-z|--zoom|zoom|Yes (a period or an ISO date)|Defines the start date of the charts. Still uses data before that for trends, cumulative cases, R-values, etc... See notes for possible values.
+-s|--stack|stack_by|Yes (age, sex, or province)|Instead of a simple daily case plot, plots a stacked area chart. Caveats: Smoothing is disabled (so the argument is irrelevant) and province stacking + province filtering doesn't work (for obvious reasons).
+-r|--ratio|per_capita|No (boolean in a json)|The numbers will be shown as cases/100 000 person instead of the raw case counts.
 
 ### Notes:
 
