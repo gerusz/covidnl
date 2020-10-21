@@ -1,6 +1,6 @@
 import datetime
 import sys
-from typing import Tuple, Union, List, Callable
+from typing import Tuple, Union, List, Callable, Optional, Any, Dict
 
 
 class CovidCase:
@@ -27,7 +27,7 @@ class CovidCase:
 		self.dead: bool = (deceased == "Yes")
 	
 	@staticmethod
-	def from_dict(jsondict):
+	def from_dict(jsondict: Dict[str, Any]):
 		"""
 		Loads the details of this case from a JSON dictionary
 		:param jsondict: The JSON dictionary containing the details of the case
@@ -61,7 +61,7 @@ class CaseFilter:
 	)
 	
 	@staticmethod
-	def process_age_filter(input_filter: Union[str, Tuple[int, Union[int, None]]]) -> Union[None, Tuple[str, ...]]:
+	def process_age_filter(input_filter: Union[str, Tuple[int, Union[int, None]]]) -> Optional[Tuple[str, ...]]:
 		if input_filter is str:
 			filter_comps = str.split(input_filter, "-")
 			try:
@@ -107,8 +107,12 @@ class CaseFilter:
 		age_tuples = CaseFilter.ages[first_range_idx:last_range_idx + 1:]
 		return tuple(x[0] for x in age_tuples)
 	
-	def __init__(self, province_filter: Union[str, None] = None, age_filter: Union[str, Tuple[int, Union[int, None]], None] = None,
-	             from_date: Union[datetime.date, None] = None, cutoff_date: Union[datetime.date, None] = None):
+	def __init__(
+			self,
+			province_filter: Optional[str] = None,
+			age_filter: Union[str, Tuple[int, Union[int, None]], None] = None,
+			from_date: Optional[datetime.date] = None,
+			cutoff_date: Optional[datetime.date] = None):
 		self.province_filter = province_filter
 		self.age_filter = CaseFilter.process_age_filter(age_filter) if age_filter is not None else None
 		self.from_date = from_date

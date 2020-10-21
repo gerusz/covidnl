@@ -277,3 +277,4 @@ $RECYCLE.BIN/
 covidnl/__pycache__/
 covidnl/latest.json
 latest.json
+/covidnl/config/

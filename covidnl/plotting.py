@@ -1,5 +1,5 @@
 import datetime
-from typing import List, Tuple, Union
+from typing import List, Tuple, Optional
 
 import numpy as np
 from matplotlib import pyplot as plt, ticker as ticker
@@ -13,7 +13,7 @@ def plot_daily_cases(
 		death_counts: np.ndarray,
 		hosp_counts: np.ndarray,
 		smoothing_window: int,
-		start_date: Union[datetime.date, None] = None
+		start_date: Optional[datetime.date] = None
 ):
 	start_idx = zoom_start_idx(days, start_date)
 	
@@ -42,7 +42,7 @@ def plot_daily_cases(
 	print("Daily cases plotted.")
 
 
-def zoom_start_idx(days, start_date):
+def zoom_start_idx(days: List[datetime.date], start_date: Optional[datetime.date]) -> int:
 	start_idx = 0
 	if start_date is not None:
 		for idx, day in enumerate(days):
@@ -55,9 +55,9 @@ def zoom_start_idx(days, start_date):
 def plot_stacked_cases(
 		days: List[datetime.date],
 		stacked_cases_per_day: np.ndarray,
-		stack_labels: Tuple,
+		stack_labels: Tuple[str, ...],
 		stack_by: str,
-		start_date: Union[datetime.date, None] = None):
+		start_date: Optional[datetime.date] = None):
 	start_idx = zoom_start_idx(days, start_date)
 	
 	plt.stackplot(days[start_idx::], stacked_cases_per_day[:, start_idx:], labels=stack_labels)
@@ -97,7 +97,7 @@ def plot_r_rate_old_style(case_counts_used, cumulative_x, exponent_trendline, se
 	plt.margins(x=0)
 
 
-def plot_r_rate(days: List[datetime.date], r_rates: np.ndarray, start_date: Union[datetime.date, None] = None):
+def plot_r_rate(days: List[datetime.date], r_rates: np.ndarray, start_date: Optional[datetime.date] = None):
 	start_idx = zoom_start_idx(days, start_date)
 	if start_idx < 15:
 		start_idx = 15
@@ -118,11 +118,11 @@ def plot_r_rate(days: List[datetime.date], r_rates: np.ndarray, start_date: Unio
 
 
 def plot_cumulative_cases(
-		days,
-		cumulative_cases,
-		cumulative_deaths,
-		cumulative_hosp,
-		start_date: Union[datetime.date, None] = None):
+		days: List[datetime.date],
+		cumulative_cases: List[float],
+		cumulative_deaths: List[float],
+		cumulative_hosp: List[float],
+		start_date: Optional[datetime.date] = None):
 	start_idx = zoom_start_idx(days, start_date)
 	
 	plt.plot(days[start_idx::], cumulative_cases[start_idx::], label="Cases")

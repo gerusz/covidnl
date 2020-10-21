@@ -5,7 +5,7 @@ import re
 import sys
 import urllib.request
 from email import utils as eut
-from typing import Union, Tuple
+from typing import Union, Tuple, List, Optional
 from urllib.error import URLError
 
 from progressbar import ProgressBar, Percentage, Bar
@@ -142,7 +142,7 @@ def validate_date_filter(arg_value: str, relative_to: Union[datetime.date, None]
 			sys.exit(2)
 
 
-def load_cases(force_download):
+def load_cases(force_download: bool) -> List[CovidCase]:
 	should_download: bool = True
 	if not force_download and os.path.isfile(latest_file_location):
 		cache_date: datetime = datetime.datetime.fromtimestamp(os.path.getmtime(latest_file_location), tz=datetime.datetime.now().astimezone().tzinfo)
@@ -172,7 +172,7 @@ def load_cases(force_download):
 	return cases
 
 
-def validate_age_filter(arg_value: str) -> Tuple[int, Union[int, None]]:
+def validate_age_filter(arg_value: str) -> Tuple[int, Optional[int]]:
 	filter_comps = str.split(arg_value, "-")
 	try:
 		if filter_comps[0] == "90+":
