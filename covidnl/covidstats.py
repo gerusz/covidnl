@@ -25,7 +25,8 @@ class RunConfig:
 			smoothing_window: int = 7,
 			stack_by: Optional[str] = None,
 			zoom_str: Optional[str] = None,
-			per_capita: bool = False):
+			per_capita: bool = False,
+			logarithmic: bool = False):
 		"""
 		Initializes a run config. Can be called without parameters for a default run config.
 		:param force_download: Whether the data file needs to be downloaded regardless of the local cache's freshness. Default: False.
@@ -35,8 +36,9 @@ class RunConfig:
 		:param date_filter_str: The date filter as a string. Default: None
 		:param smoothing_window: The window for the trendline smoothing. Default: 7
 		:param stack_by: The value to stack the daily trends by. Default: None.
-		:param zoom_str: Date zoom for the charts where the X-axis is a date.
-		:param per_capita: Whether the daily and the total numbers should be displayed per capita.
+		:param zoom_str: Date zoom for the charts where the X-axis is a date. Default: None.
+		:param per_capita: Whether the daily and the total numbers should be displayed per capita. Default: False.
+		:param logarithmic: Whether the daily and the total numbers should be displayed logarithmically. Default: False.
 		"""
 		self.force_download = force_download
 		self.filter_params = {"province_filter": province_filter, "age_filter": age_filter, "date_filter": date_filter_str, "cutoff_days": cutoff_days}
@@ -44,6 +46,7 @@ class RunConfig:
 		self.stack_by = stack_by
 		self.zoom = zoom_str
 		self.per_capita = per_capita
+		self.logarithmic = logarithmic
 	
 	@staticmethod
 	def from_json(json_dict: Dict):
@@ -56,7 +59,9 @@ class RunConfig:
 			json_dict.get("smoothing_window", 7),
 			json_dict.get("stack_by", None),
 			json_dict.get("zoom", None),
-			json_dict.get("per_capita", False))
+			json_dict.get("per_capita", False),
+			json_dict.get("logarithmic", False)
+		)
 
 
 def main(config: RunConfig = RunConfig()):
@@ -117,7 +122,7 @@ def main(config: RunConfig = RunConfig()):
 	else:
 		stack_labels, stacked_cases_per_day = separate_stacks(cases, days, config.stack_by, case_filter, config.per_capita)
 		plot_stacked_cases(days, stacked_cases_per_day, stack_labels, config.stack_by, zoom_to)
-	daily_cases_common(config.per_capita)
+	daily_cases_common(config.per_capita, config.logarithmic)
 	
 	# Cumulative cases plot
 	plt.subplot(223)
@@ -144,12 +149,13 @@ def run_config_from_args(args) -> RunConfig:
 	date_filter_arg_str: Union[str, None] = None
 	zoom_arg_str: Union[str, None] = None
 	per_capita_arg: bool = False
+	logarithmic_arg: bool = False
 	
 	try:
 		options, trailing_args = getopt.getopt(
 			args,
-			"hfw:p:c:s:a:d:z:r",
-			["help", "force", "window=", "province=", "cutoff=", "stack=", "age=", "date=", "zoom=", "ratio"])
+			"hfw:p:c:s:a:d:z:rl",
+			["help", "force", "window=", "province=", "cutoff=", "stack=", "age=", "date=", "zoom=", "ratio", "log", "logarithmic"])
 		for option, value in options:
 			if option in ("-h", "--help"):
 				print_help()
@@ -172,6 +178,8 @@ def run_config_from_args(args) -> RunConfig:
 				zoom_arg_str = value
 			elif option in ("-r", "--ratio"):
 				per_capita_arg = True
+			elif option in ("-l", "--log", "--logarithmic"):
+				logarithmic_arg = True
 	
 	except getopt.GetoptError:
 		print_help()
@@ -194,7 +202,9 @@ def run_config_from_args(args) -> RunConfig:
 		smoothing_window_arg,
 		stack_arg,
 		zoom_arg_str,
-		per_capita_arg)
+		per_capita_arg,
+		logarithmic_arg
+	)
 
 
 def run_config_from_file(file_path: str) -> RunConfig:

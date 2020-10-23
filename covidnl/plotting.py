@@ -65,7 +65,7 @@ def plot_stacked_cases(
 	print("Stacked cases plotted.")
 
 
-def daily_cases_common(per_capita: bool = False):
+def daily_cases_common(per_capita: bool = False, logarithmic: bool = False):
 	plt.xlabel("Date")
 	plt.xticks(rotation=90)
 	x_axis = plt.gcf().axes[0].get_xaxis()
@@ -76,11 +76,18 @@ def daily_cases_common(per_capita: bool = False):
 		y_axis.set_major_locator(ticker.MultipleLocator(1))
 		y_axis.set_minor_locator(ticker.AutoMinorLocator(4))
 	else:
-		y_axis.set_major_locator(ticker.MultipleLocator(200))
-		y_axis.set_minor_locator(ticker.AutoMinorLocator(4))
-	plt.ylabel("Cases" + " per capita" if per_capita else "")
+		y_axis.set_major_locator(ticker.MultipleLocator(500))
+		y_axis.set_minor_locator(ticker.AutoMinorLocator(5))
+	if logarithmic:
+		plt.yscale("log")
+	y_label = "Cases"
+	if per_capita:
+		y_label += " per capita"
+	if logarithmic:
+		y_label += " (log)"
+	plt.ylabel(y_label)
 	plt.legend(loc='upper left')
-	plt.margins(x=0)
+	plt.margins(x=0, y=0)
 	print("Common stuff set for daily cases.")
 
 

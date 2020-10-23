@@ -117,7 +117,7 @@ class CaseFilter:
 		self.age_filter = CaseFilter.process_age_filter(age_filter) if age_filter is not None else None
 		self.from_date = from_date
 		self.cutoff_date = cutoff_date
-		self.filters: List[Callable[[CovidCase], bool], ...] = list()
+		self.filters: List[Callable[[CovidCase], bool]] = list()
 		if self.cutoff_date is not None:
 			self.filters.append(lambda x: self.cutoff_date >= x.day)
 		if self.from_date is not None:

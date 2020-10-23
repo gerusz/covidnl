@@ -10,7 +10,7 @@ The charts are:
 * Bottom left: cumulative cases on a logarithmic scale
 * Bottom right: approximate r-rate chart. Blue means the pandemic is under control, red means it isn't.
 
-The file is [found here](https://data.rivm.nl/covid-19/COVID-19_casus_landelijk.json). Warning, it's a 30 MB JSON file (that's going to be fatter the more the govt. botches the pandemic response) so try to open it with a sane text editor. (That is, not notepad.)
+The file is [found here](https://data.rivm.nl/covid-19/COVID-19_casus_landelijk.json). Warning, it's a several dozen megabyte JSON file (that's going to be fatter the more the govt. botches the pandemic response) so try to open it with a sane text editor. (That is, not notepad.)
 
 # How to use it?
 
@@ -40,6 +40,7 @@ Short argument|Long argument|Field in a config JSON|Value required?|Effect
 -z|--zoom|zoom|Yes (a period or an ISO date)|Defines the start date of the charts. Still uses data before that for trends, cumulative cases, R-values, etc... See notes for possible values.
 -s|--stack|stack_by|Yes (age, sex, or province)|Instead of a simple daily case plot, plots a stacked area chart. Caveats: Smoothing is disabled (so the argument is irrelevant) and province stacking + province filtering doesn't work (for obvious reasons).
 -r|--ratio|per_capita|No (boolean in a json)|The numbers will be shown as cases/100 000 person instead of the raw case counts.
+-l|--log|logarithmic|No (boolean in a json)|Daily cases will be shown logarithmically instead of linearly
 
 ### Notes:
 
