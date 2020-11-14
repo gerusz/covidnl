@@ -8,7 +8,7 @@ from email import utils as eut
 from typing import Union, Tuple, List, Optional
 from urllib.error import URLError
 
-from progressbar import ProgressBar, Percentage, Bar
+from progressbar import ProgressBar, Percentage, Bar, AdaptiveETA, FileTransferSpeed
 
 from covidnl.model import CovidCase
 from covidnl.stats import provinces
@@ -58,12 +58,17 @@ def validate_cutoff(arg_value: Union[str, int]) -> int:
 
 
 latest_file_location = "latest.json"
-progress_bar = ProgressBar(widgets=[Percentage(), Bar()])
+progress_bar: Optional[ProgressBar] = None
 
 
 def dl_progress(count, block_size, total_size):
 	global progress_bar
-	progress_bar.update(int(count * block_size * 100 / total_size))
+	if progress_bar is None:
+		progress_bar = ProgressBar(widgets=[Percentage(), Bar(), FileTransferSpeed(), AdaptiveETA()], maxval=int(total_size))
+		print("Data size: {} MB".format(int(total_size / (1024 * 1024))))
+		progress_bar.start()
+	progress = count * block_size
+	progress_bar.update(progress if progress < total_size else total_size)
 
 
 def validate_smoothing_window(arg_value: Union[str, int]) -> int:
@@ -163,13 +168,20 @@ def load_cases(force_download: bool) -> List[CovidCase]:
 					os.path.abspath(latest_file_location), cache_date))
 	if should_download:
 		print("Downloading most recent data...")
-		global progress_bar
-		progress_bar.start()
 		urllib.request.urlretrieve(JSON_URL, latest_file_location, reporthook=dl_progress)
+		print()
 		print("Data downloaded.")
-	json_data = json.load(open(latest_file_location))
-	cases = list(map(lambda j: CovidCase.from_dict(j), json_data))
-	return cases
+	try:
+		json_data = json.load(open(latest_file_location))
+		cases = list(map(lambda j: CovidCase.from_dict(j), json_data))
+		return cases
+	except json.decoder.JSONDecodeError:
+		if not should_download:
+			print("Couldn't decode cached data. Trying to redownload it...")
+			return load_cases(True)
+		else:
+			print("Downloaded data invalid. Try again.")
+			sys.exit(-2)
 
 
 def validate_age_filter(arg_value: str) -> Tuple[int, Optional[int]]:

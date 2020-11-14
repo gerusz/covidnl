@@ -108,8 +108,11 @@ def plot_r_rate(days: List[datetime.date], r_rates: np.ndarray, start_date: Opti
 	start_idx = zoom_start_idx(days, start_date)
 	if start_idx < 15:
 		start_idx = 15
-	r_below = np.ma.masked_where(r_rates >= 1.01, r_rates)
-	r_above = np.ma.masked_where(r_rates <= 0.99, r_rates)
+	mask_above = np.ma.masked_where(r_rates > 1.0, r_rates).max()
+	mask_below = np.ma.masked_where(r_rates < 1.0, r_rates).min()
+	r_below = np.ma.masked_greater_equal(r_rates, mask_above + 0.025)
+	r_above = np.ma.masked_less_equal(r_rates, mask_below - 0.025)
+	
 	plt.plot(days[start_idx::], r_below[start_idx::], days[start_idx::], r_above[start_idx::])
 	plt.xlabel("Date")
 	plt.ylabel("Estimated R-rate")
