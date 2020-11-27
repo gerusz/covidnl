@@ -61,35 +61,9 @@ class CaseFilter:
 	)
 	
 	@staticmethod
-	def process_age_filter(input_filter: Union[str, Tuple[int, Union[int, None]]]) -> Optional[Tuple[str, ...]]:
+	def process_age_filter(input_filter: Union[str, Tuple[int, Optional[int]]]) -> Optional[Tuple[str, ...]]:
 		if input_filter is str:
-			filter_comps = str.split(input_filter, "-")
-			try:
-				if filter_comps[0] == "90+":
-					age_from = 90
-				else:
-					age_from = int(filter_comps[0])
-					if age_from > 90:
-						age_from = 90
-				if len(filter_comps) > 1:
-					if filter_comps[1] == "90+":
-						age_to = 90
-					else:
-						age_to = int(filter_comps[1])
-						if age_to > 90:
-							age_to = 90
-				else:
-					age_to = None
-				if age_to < age_from:
-					raise ValueError
-			except ValueError:
-				print("Invalid age filter string: {}".format(input_filter))
-				print("Valid filter: <age-from>[-<age-to>] where: ")
-				print("\tage-from: 0-999 or \"90+\",")
-				print("\tage-to: 0-999 or \"90+\" and >= age-from")
-				print("Note: the data contains age in ranges of 10. So age-from will be rounded down to the nearest multiple of 10 and age-to will be rounded up\
-				to the next k*10-1.")
-				sys.exit(2)
+			age_from, age_to = CaseFilter.process_age_filter_string(input_filter)
 		else:
 			age_from = input_filter[0]
 			age_to = input_filter[1]
@@ -107,12 +81,51 @@ class CaseFilter:
 		age_tuples = CaseFilter.ages[first_range_idx:last_range_idx + 1:]
 		return tuple(x[0] for x in age_tuples)
 	
+	@staticmethod
+	def process_age_filter_string(input_filter: str) -> Tuple[int, Optional[int]]:
+		"""
+		Processes the age filter string into a pair of integers (the second is optional).
+		:param input_filter: The input filter string, either a single age or two ages separated by a hyphen
+		:return: A tuple containing the first age from the parameters as an int and optionally the second one too
+		"""
+		filter_comps = str.split(input_filter, "-")
+		try:
+			# Find the age range for the start of the age filter
+			if filter_comps[0] == "90+":
+				age_from = 90
+			else:
+				age_from = int(filter_comps[0])
+				if age_from > 90:
+					age_from = 90
+			
+			# If there is a second age range in the filter, find that one too
+			if len(filter_comps) > 1:
+				if filter_comps[1] == "90+":
+					age_to = 90
+				else:
+					age_to = int(filter_comps[1])
+					if age_to > 90:
+						age_to = 90
+			else:
+				age_to = None
+			if age_to is not None and age_to < age_from:
+				raise ValueError
+		except ValueError:
+			print("Invalid age filter string: {}".format(input_filter))
+			print("Valid filter: <age-from>[-<age-to>] where: ")
+			print("\tage-from: 0-999 or \"90+\",")
+			print("\tage-to: 0-999 or \"90+\" and >= age-from")
+			print("Note: the data contains age in ranges of 10. So age-from will be rounded down to the nearest multiple of 10 and age-to will be rounded up\
+				to the next k*10-1.")
+			sys.exit(2)
+		return age_from, age_to
+	
 	def __init__(
 			self,
 			province_filter: Optional[str] = None,
 			age_filter: Union[str, Tuple[int, Union[int, None]], None] = None,
-			from_date: Optional[datetime.date] = None,
-			cutoff_date: Optional[datetime.date] = None):
+			cutoff_date: Optional[datetime.date] = None,
+			from_date: Optional[datetime.date] = None):
 		self.province_filter = province_filter
 		self.age_filter = CaseFilter.process_age_filter(age_filter) if age_filter is not None else None
 		self.from_date = from_date

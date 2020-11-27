@@ -5,6 +5,20 @@ import numpy as np
 
 from covidnl.model import CovidCase, CaseFilter
 
+AGE_CATEGORIES = (
+	"Unknown",
+	"0-9",
+	"10-19",
+	"20-29",
+	"30-39",
+	"40-49",
+	"50-59",
+	"60-69",
+	"70-79",
+	"80-89",
+	"90+"
+)
+
 
 def calculate_smoothed_trends(
 		case_counts: np.ndarray,
@@ -74,35 +88,14 @@ def separate_stacks(cases: List[CovidCase], days: List[datetime.date], stack: st
 	:return: A tuple consisting of a list of stack labels (strings) and a 2D NumPy array, first dimension: stack, second dimension: day.
 	"""
 	
-	if stack == "province":
-		province_names = list(provinces.keys())
-		province_names.sort(key=lambda prov: provinces.get(prov), reverse=True)
-		stack_labels: Tuple[str, ...] = tuple(province_names)
-	elif stack == "sex":
-		stack_labels = ("Male", "Female")
-	else:
-		stack_labels = case_filter.age_filter if case_filter.age_filter is not None else (
-			"Unknown",
-			"0-9",
-			"10-19",
-			"20-29",
-			"30-39",
-			"40-49",
-			"50-59",
-			"60-69",
-			"70-79",
-			"80-89",
-			"90+"
-		)
+	stack_labels = get_stack_labels(case_filter, stack)
+	
 	stacked_cases_per_day: np.ndarray = np.zeros((len(stack_labels), len(days)), dtype=float)
+	
 	for c_case in cases:
 		if not case_filter.filter(c_case):  # Cutoff day also integrated in the filter
 			continue
-		stack_key = c_case.province if stack == "province" else (c_case.sex if stack == "sex" else c_case.age)
-		if stack_key in stack_labels:
-			stack_idx = stack_labels.index(stack_key)
-			day_idx = days.index(c_case.day)
-			stacked_cases_per_day[stack_idx][day_idx] += 1
+		assign_case_to_stack(c_case, days, stack, stack_labels, stacked_cases_per_day)
 	if per_capita:
 		total_population = sum(provinces.values()) / 100000
 		for day_idx in range(len(days)):
@@ -114,6 +107,31 @@ def separate_stacks(cases: List[CovidCase], days: List[datetime.date], stack: st
 				stacked_cases_per_day[p_idx, day_idx] = stacked_cases_per_day[p_idx, day_idx] * normalization_factor
 	
 	return stack_labels, stacked_cases_per_day
+
+
+def get_stack_labels(case_filter, stack):
+	if stack == "province":
+		province_names = list(provinces.keys())
+		province_names.sort(key=lambda prov: provinces.get(prov), reverse=True)
+		stack_labels: Tuple[str, ...] = tuple(province_names)
+	elif stack == "sex":
+		stack_labels = ("Male", "Female")
+	else:
+		stack_labels = case_filter.age_filter if case_filter.age_filter is not None else AGE_CATEGORIES
+	return stack_labels
+
+
+def assign_case_to_stack(c_case, days, stack, stack_labels, stacked_cases_per_day):
+	if stack == "province":
+		stack_key = c_case.province
+	elif stack == "sex":
+		stack_key = c_case.sex
+	else:
+		stack_key = c_case.age
+	if stack_key in stack_labels:
+		stack_idx = stack_labels.index(stack_key)
+		day_idx = days.index(c_case.day)
+		stacked_cases_per_day[stack_idx][day_idx] += 1
 
 
 def calculate_r_estimation(cases: np.ndarray, per_capita: bool) -> Tuple[np.ndarray, int]:
@@ -128,9 +146,10 @@ def calculate_r_estimation(cases: np.ndarray, per_capita: bool) -> Tuple[np.ndar
 	r_estimates = np.zeros(len(cases))
 	total_population = sum(provinces.values()) / 100000 if per_capita else 1
 	
-	ignore: int = 15
-	for ignore in range(len(fifteen_day_avg)):
+	ignore = 15
+	for idx in range(15, len(fifteen_day_avg)):
 		if fifteen_day_avg[ignore] >= 150 / total_population:
+			ignore = idx
 			break
 	
 	for day_idx in range(15, len(cases), 1):

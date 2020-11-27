@@ -101,16 +101,20 @@ def validate_stack(arg_value: str) -> str:
 	sys.exit(2)
 
 
+def iso_date(arg_value: str):
+	try:
+		return datetime.date.fromisoformat(arg_value)
+	except ValueError as err:
+		print("Invalid date {}: {}".format(arg_value, err))
+		sys.exit(-2)
+
+
 def validate_date_filter(arg_value: str, relative_to: Union[datetime.date, None] = None) -> Union[datetime.date, datetime.timedelta]:
 	date_as_duration = re.compile("(?P<num>[1-9]\\d*)\\s*(?P<unit>[dDwWmMyY])")  # Now that Y there... _that's_ my trademark optimism!
 	date_as_iso = re.compile("202\\d-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])")
 	
 	if date_as_iso.match(arg_value):
-		try:
-			return datetime.date.fromisoformat(arg_value)
-		except ValueError as err:
-			print("Invalid date {}: {}".format(arg_value, err))
-			sys.exit(2)
+		return iso_date(arg_value)
 	else:
 		duration_match = date_as_duration.match(arg_value)
 		if duration_match:
@@ -119,32 +123,48 @@ def validate_date_filter(arg_value: str, relative_to: Union[datetime.date, None]
 			if relative_to is None:
 				relative_to = datetime.date.today()
 			if unit == "y":
-				new_year = relative_to.year - num
-				# Edge case, symbolizing my undying optimism about the pandemic response... see you in 2024, bug that I just prevented
-				# You can probably still crash it if you target the year 1900, but that's just stupid.
-				if relative_to.month == 2 and relative_to.day == 29 and new_year % 4 > 0:
-					return relative_to.replace(year=new_year, day=28)
-				return relative_to.replace(year=new_year)
+				return date_filter_as_years(num, relative_to)
 			elif unit == "m":
-				today_m_zero_indexed = relative_to.month - 1
-				if num >= today_m_zero_indexed:
-					new_year = relative_to.year - (num // 12 + 1)
-					new_month = 13 - (num % 12)
-				else:
-					new_year = relative_to.year
-					new_month = relative_to.month - num
-				try:
-					return relative_to.replace(year=new_year, month=new_month)
-				except ValueError:
-					# Issue that this fixes: apparently today's day is greater than the number of days in the target month. (Or the same leap year issue as above.)
-					return datetime.timedelta(days=(365.25 / 12) * num)
+				return date_filter_as_months(num, relative_to)
 			elif unit == "w":
-				return datetime.timedelta(weeks=num)
+				return date_filter_as_weeks(num)
 			else:
-				return datetime.timedelta(days=num)
+				return date_filter_as_days(num)
 		else:
 			print("Invalid start date delta: {}. Start date must be an integer followed by a time unit (y, m, w or d) or an ISO date (yyyy-mm-dd).")
 			sys.exit(2)
+
+
+def date_filter_as_days(num):
+	return datetime.timedelta(days=num)
+
+
+def date_filter_as_weeks(num):
+	return datetime.timedelta(weeks=num)
+
+
+def date_filter_as_months(num, relative_to):
+	today_m_zero_indexed = relative_to.month - 1
+	if num >= today_m_zero_indexed:
+		new_year = relative_to.year - (num // 12 + 1)
+		new_month = 13 - (num % 12)
+	else:
+		new_year = relative_to.year
+		new_month = relative_to.month - num
+	try:
+		return relative_to.replace(year=new_year, month=new_month)
+	except ValueError:
+		# Issue that this fixes: apparently today's day is greater than the number of days in the target month. (Or the same leap year issue as above.)
+		return datetime.timedelta(days=(365.25 / 12) * num)
+
+
+def date_filter_as_years(num, relative_to):
+	new_year = relative_to.year - num
+	# Edge case, symbolizing my undying optimism about the pandemic response... see you in 2024, bug that I just prevented
+	# You can probably still crash it if you target the year 1900, but that's just stupid.
+	if relative_to.month == 2 and relative_to.day == 29 and new_year % 4 > 0:
+		return relative_to.replace(year=new_year, day=28)
+	return relative_to.replace(year=new_year)
 
 
 def load_cases(force_download: bool) -> List[CovidCase]:

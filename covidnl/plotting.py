@@ -17,14 +17,16 @@ def plot_daily_cases(
 ):
 	start_idx = zoom_start_idx(days, start_date)
 	
+	title = "Daily cases"
+	
 	if smoothing_window != 0:
 		smoothed_cases, smoothed_deaths, smoothed_hosp = calculate_smoothed_trends(case_counts, death_counts, hosp_counts, smoothing_window)
 		shift = smoothing_window // 2
-		plt.title("Daily cases and trend (smoothing window: {})".format(smoothing_window))
-	else:
-		plt.title("Daily cases")
+		title += "and trend (smoothing window: {})".format(smoothing_window)
 	
-	plt.plot(days[start_idx::], case_counts[start_idx::], label="Daily cases")
+	plt.title(title)
+	
+	plt.plot(days[start_idx::], case_counts[start_idx::], label="Cases")
 	if smoothing_window != 0:
 		# If the above condition is true, the variables are set.
 		# noinspection PyUnboundLocalVariable
@@ -105,9 +107,7 @@ def plot_r_rate_old_style(case_counts_used, cumulative_x, exponent_trendline, se
 
 
 def plot_r_rate(days: List[datetime.date], r_rates: np.ndarray, start_date: Optional[datetime.date] = None):
-	start_idx = zoom_start_idx(days, start_date)
-	if start_idx < 15:
-		start_idx = 15
+	start_idx = max(15, zoom_start_idx(days, start_date))
 	mask_above = np.ma.masked_where(r_rates > 1.0, r_rates).max()
 	mask_below = np.ma.masked_where(r_rates < 1.0, r_rates).min()
 	r_below = np.ma.masked_greater_equal(r_rates, mask_above + 0.025)
