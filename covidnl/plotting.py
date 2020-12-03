@@ -22,7 +22,7 @@ def plot_daily_cases(
 	if smoothing_window != 0:
 		smoothed_cases, smoothed_deaths, smoothed_hosp = calculate_smoothed_trends(case_counts, death_counts, hosp_counts, smoothing_window)
 		shift = smoothing_window // 2
-		title += "and trend (smoothing window: {})".format(smoothing_window)
+		title += " and trend (smoothing window: {})".format(smoothing_window)
 	
 	plt.title(title)
 	
@@ -31,11 +31,13 @@ def plot_daily_cases(
 		# If the above condition is true, the variables are set.
 		# noinspection PyUnboundLocalVariable
 		plt.plot(days[start_idx:-shift:], smoothed_cases[start_idx + shift::], label="Trend ({} day avg.)".format(smoothing_window))
+	
 	plt.plot(days[start_idx::], death_counts[start_idx::], label="Deaths")
 	if smoothing_window != 0:
 		# If the above condition is true, the variables are set.
 		# noinspection PyUnboundLocalVariable
 		plt.plot(days[start_idx:-shift:], smoothed_deaths[start_idx + shift::], label="Death trend ({} day avg.)".format(smoothing_window))
+	
 	plt.plot(days[start_idx::], hosp_counts[start_idx::], label="Hospitalizations")
 	if smoothing_window != 0:
 		# If the above condition is true, the variables are set.
