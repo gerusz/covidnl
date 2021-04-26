@@ -1,5 +1,5 @@
 import datetime
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 from matplotlib import pyplot as plt, ticker as ticker
@@ -14,7 +14,7 @@ def plot_daily_cases(
 		hosp_counts: np.ndarray,
 		smoothing_window: int,
 		start_date: Optional[datetime.date] = None
-):
+		):
 	start_idx = zoom_start_idx(days, start_date)
 	
 	title = "Daily cases"

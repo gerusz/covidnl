@@ -1,9 +1,9 @@
 import getopt
 import json
 import sys
-from typing import Optional, Dict, Union, Tuple
+from typing import Dict, Optional, Tuple, Union
 
-from covidnl.util import print_help, validate_smoothing_window, validate_province, validate_cutoff, validate_stack, validate_age_filter
+from covidnl.util import print_help, validate_age_filter, validate_cutoff, validate_province, validate_smoothing_window, validate_stack
 
 
 class RunConfig:
@@ -33,8 +33,11 @@ class RunConfig:
 		:param logarithmic: Whether the daily and the total numbers should be displayed logarithmically. Default: False.
 		"""
 		self.force_download = force_download
-		self.filter_params: Dict[str, Union[str, int, Tuple[int, Optional[int]]]] = {"province_filter": province_filter, "age_filter": age_filter,
-		                                                                             "date_filter": date_filter_str, "cutoff_days": cutoff_days}
+		self.filter_params: Dict[str, Union[str, int, Tuple[int, Optional[int]]]] = {
+				"province_filter": province_filter,
+				"age_filter"     : age_filter,
+				"date_filter"    : date_filter_str,
+				"cutoff_days"    : cutoff_days}
 		self.smoothing_window = smoothing_window
 		self.stack_by = stack_by
 		self.zoom = zoom_str
@@ -44,17 +47,17 @@ class RunConfig:
 	@staticmethod
 	def from_json(json_dict: Dict):
 		return RunConfig(
-			json_dict.get("force_download", False),
-			json_dict.get("filter_params", dict()).get("province_filter", None),
-			json_dict.get("filter_params", dict()).get("cutoff_days", 7),
-			json_dict.get("filter_params", dict()).get("age_filter", None),
-			json_dict.get("filter_params", dict()).get("date_filter", None),
-			json_dict.get("smoothing_window", 7),
-			json_dict.get("stack_by", None),
-			json_dict.get("zoom", None),
-			json_dict.get("per_capita", False),
-			json_dict.get("logarithmic", False)
-		)
+				json_dict.get("force_download", False),
+				json_dict.get("filter_params", dict()).get("province_filter", None),
+				json_dict.get("filter_params", dict()).get("cutoff_days", 7),
+				json_dict.get("filter_params", dict()).get("age_filter", None),
+				json_dict.get("filter_params", dict()).get("date_filter", None),
+				json_dict.get("smoothing_window", 7),
+				json_dict.get("stack_by", None),
+				json_dict.get("zoom", None),
+				json_dict.get("per_capita", False),
+				json_dict.get("logarithmic", False)
+				)
 
 
 def run_config_from_args(args) -> RunConfig:
@@ -62,9 +65,9 @@ def run_config_from_args(args) -> RunConfig:
 	
 	try:
 		options, trailing_args = getopt.getopt(
-			args,
-			"hfw:p:c:s:a:d:z:rl",
-			["help", "force", "window=", "province=", "cutoff=", "stack=", "age=", "date=", "zoom=", "ratio", "log", "logarithmic"])
+				args,
+				"hfw:p:c:s:a:d:z:rl",
+				["help", "force", "window=", "province=", "cutoff=", "stack=", "age=", "date=", "zoom=", "ratio", "log", "logarithmic"])
 		for option, value in options:
 			if option in ("-h", "--help"):
 				print_help()

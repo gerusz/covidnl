@@ -1,6 +1,6 @@
 import datetime
 import sys
-from typing import Tuple, Union, List, Callable, Optional, Any, Dict
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 
 class CovidCase:
@@ -18,7 +18,7 @@ class CovidCase:
 			province: str,
 			hospital_admission: str,
 			deceased: str
-	):
+			):
 		self.day: datetime.date = datetime.date.fromisoformat(date_statistics)
 		self.age: str = age_group
 		self.sex: str = sex
@@ -37,28 +37,28 @@ class CovidCase:
 			CovidCase.file_date = datetime.datetime.fromisoformat(jsondict["Date_file"])
 			print("Information date: " + jsondict["Date_file"])
 		return CovidCase(
-			jsondict["Date_statistics"],
-			jsondict["Agegroup"],
-			jsondict["Sex"],
-			jsondict["Province"],
-			jsondict["Hospital_admission"],
-			jsondict["Deceased"]
-		)
+				jsondict["Date_statistics"],
+				jsondict["Agegroup"],
+				jsondict["Sex"],
+				jsondict["Province"],
+				jsondict["Hospital_admission"],
+				jsondict["Deceased"]
+				)
 
 
 class CaseFilter:
 	ages: Tuple[Tuple[str, int, int], ...] = (
-		("0-9", 0, 9),
-		("10-19", 10, 19),
-		("20-29", 20, 29),
-		("30-39", 30, 39),
-		("40-49", 40, 49),
-		("50-59", 50, 59),
-		("60-69", 60, 69),
-		("70-79", 70, 79),
-		("80-89", 80, 89),
-		("90+", 90, 999)
-	)
+			("0-9", 0, 9),
+			("10-19", 10, 19),
+			("20-29", 20, 29),
+			("30-39", 30, 39),
+			("40-49", 40, 49),
+			("50-59", 50, 59),
+			("60-69", 60, 69),
+			("70-79", 70, 79),
+			("80-89", 80, 89),
+			("90+", 90, 999)
+			)
 	
 	@staticmethod
 	def process_age_filter(input_filter: Union[str, Tuple[int, Optional[int]]]) -> Optional[Tuple[str, ...]]:

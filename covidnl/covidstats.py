@@ -2,14 +2,14 @@ import datetime
 import json
 import os
 import sys
-from typing import Union, Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 
-from covidnl.model import CovidCase, CaseFilter
-from covidnl.plotting import plot_daily_cases, plot_stacked_cases, daily_cases_common, plot_cumulative_cases, plot_r_rate
-from covidnl.runconfig import RunConfig, run_config_from_args, run_config_from_file
-from covidnl.stats import count_cumulative_cases, separate_stacks, get_cases_per_day, calculate_r_estimation
+from covidnl.model import CaseFilter, CovidCase
+from covidnl.plotting import daily_cases_common, plot_cumulative_cases, plot_daily_cases, plot_r_rate, plot_stacked_cases
+from covidnl.runconfig import run_config_from_args, run_config_from_file, RunConfig
+from covidnl.stats import calculate_r_estimation, count_cumulative_cases, determine_risk_level, get_cases_per_day, separate_stacks
 from covidnl.util import load_cases, validate_date_filter
 
 DEFAULT_JSON_PATH = "config/default.json"
@@ -22,6 +22,8 @@ def main(config: RunConfig = RunConfig()):
 	:return: No return value.
 	"""
 	
+	print("Time: {}".format(datetime.datetime.now()))
+	
 	cases = load_cases(config.force_download)
 	
 	cutoff_day, from_day = render_date_filter(config)
@@ -32,6 +34,8 @@ def main(config: RunConfig = RunConfig()):
 	# Calculate the common stats
 	days, case_counts, cases_per_day, death_counts, deaths_per_day, hosp_counts, hosp_per_day = get_cases_per_day(cases, case_filter, config.per_capita)
 	cumulative_cases, cumulative_deaths, cumulative_hosp = count_cumulative_cases(days, cases_per_day, deaths_per_day, hosp_per_day)
+	risk_level, cases_per_100k, hosp_per_mil = determine_risk_level(case_counts, hosp_counts)
+	print("Current risk level: {} (cases/100k last week: {}, hosp./mil last week: {})".format(risk_level, int(cases_per_100k), int(hosp_per_mil)))
 	
 	# BMH has almost enough colors for the age and the province stacking, and I'm too lazy to make my own palettes, so...
 	plt.style.use("bmh")
@@ -59,7 +63,8 @@ def main(config: RunConfig = RunConfig()):
 	plot_r_rate(days, r_rates, zoom_to if zoom_to is not None and zoom_to > r_start_day else r_start_day)
 	
 	# Window data
-	plt.gcf().canvas.set_window_title("Covid 19 in " + ("the whole Netherlands" if case_filter.province_filter is None else case_filter.province_filter))
+	plt.get_current_fig_manager().set_window_title("Covid 19 in " + (
+			"the whole Netherlands" if case_filter.province_filter is None else case_filter.province_filter))
 	plt.subplots_adjust(hspace=0.35, wspace=0.25, left=0.07, right=0.95, top=0.95, bottom=0.09)
 	plt.show()
 

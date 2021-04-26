@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from covidnl.model import CovidCase, CaseFilter
+from covidnl.model import CaseFilter, CovidCase
 
 
 class TestCaseFilter(TestCase):

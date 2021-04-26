@@ -1,23 +1,23 @@
 import datetime
-from typing import List, Tuple, Dict
+from typing import Dict, List, Tuple
 
 import numpy as np
 
-from covidnl.model import CovidCase, CaseFilter
+from covidnl.model import CaseFilter, CovidCase
 
 AGE_CATEGORIES = (
-	"Unknown",
-	"0-9",
-	"10-19",
-	"20-29",
-	"30-39",
-	"40-49",
-	"50-59",
-	"60-69",
-	"70-79",
-	"80-89",
-	"90+"
-)
+		"Unknown",
+		"0-9",
+		"10-19",
+		"20-29",
+		"30-39",
+		"40-49",
+		"50-59",
+		"60-69",
+		"70-79",
+		"80-89",
+		"90+"
+		)
 
 
 def calculate_smoothed_trends(
@@ -238,17 +238,51 @@ def get_cases_per_day(cases: List[CovidCase], case_filter: CaseFilter, per_capit
 	return days, case_counts, cases_per_day, death_counts, deaths_per_day, hosp_counts, hosp_per_day
 
 
+def determine_risk_level(case_counts: np.ndarray, hosp_counts: np.ndarray, cutoff: int = 7) -> Tuple[int, int, int]:
+	population = sum(provinces.values()) / 100000
+	cases_last_week = sum(case_counts[len(case_counts) - cutoff - 7:len(case_counts) - cutoff])
+	cases_per_100k = cases_last_week / population
+	level_by_cases = 1
+	if cases_per_100k >= 35:
+		level_by_cases += 1
+	if cases_per_100k >= 100:
+		level_by_cases += 1
+	if cases_per_100k >= 250:
+		level_by_cases += 1
+	
+	hosp_last_week = sum(hosp_counts[len(hosp_counts) - cutoff - 7:len(hosp_counts) - cutoff])
+	hosp_per_mil = (hosp_last_week * 10) / population
+	level_by_hosp_pm = 1
+	if hosp_per_mil >= 4:
+		level_by_hosp_pm += 1
+	if hosp_per_mil >= 16:
+		level_by_hosp_pm += 1
+	if hosp_per_mil >= 27:
+		level_by_hosp_pm += 1
+	
+	level_by_hosp_daily = 1
+	examined_period = hosp_counts[len(hosp_counts) - cutoff - 14:len(hosp_counts) - cutoff]
+	if any(dh >= 12 for dh in examined_period):
+		level_by_hosp_daily += 1
+	if any(dh >= 40 for dh in examined_period):
+		level_by_hosp_daily += 1
+	if any(dh >= 80 for dh in examined_period):
+		level_by_hosp_daily += 1
+	
+	return max(level_by_cases, level_by_hosp_pm, level_by_hosp_daily), cases_per_100k, hosp_per_mil
+
+
 provinces: Dict[str, int] = {
-	"Zuid-Holland": 3708696,
-	"Noord-Holland": 2879527,
-	"Noord-Brabant": 2562955,
-	"Gelderland": 2085952,
-	"Utrecht": 1354834,
-	"Overijssel": 1162406,
-	"Limburg": 1117201,
-	"Friesland": 649957,
-	"Groningen": 585866,
-	"Drenthe": 493682,
-	"Flevoland": 423021,
-	"Zeeland": 383488,
-}
+		"Zuid-Holland" : 3708696,
+		"Noord-Holland": 2879527,
+		"Noord-Brabant": 2562955,
+		"Gelderland"   : 2085952,
+		"Utrecht"      : 1354834,
+		"Overijssel"   : 1162406,
+		"Limburg"      : 1117201,
+		"Friesland"    : 649957,
+		"Groningen"    : 585866,
+		"Drenthe"      : 493682,
+		"Flevoland"    : 423021,
+		"Zeeland"      : 383488,
+		}

@@ -3,12 +3,11 @@ import json
 import os.path
 import re
 import sys
-import urllib.request
 from email import utils as eut
-from typing import Union, Tuple, List, Optional
-from urllib.error import URLError
+from typing import List, Optional, Tuple, Union
 
-from progressbar import ProgressBar, Percentage, Bar, AdaptiveETA, FileTransferSpeed
+import urllib3
+from progressbar import AdaptiveETA, Bar, FileTransferSpeed, Percentage, ProgressBar
 
 from covidnl.model import CovidCase
 from covidnl.stats import provinces
@@ -167,36 +166,57 @@ def date_filter_as_years(num, relative_to):
 	return relative_to.replace(year=new_year)
 
 
-def load_cases(force_download: bool) -> List[CovidCase]:
+def download_file_if_newer(url: str, location: str, force_download: bool = False) -> bool:
+	"""
+	Downloads file from the given URL to the given location if the online version was modified before the cached file, there is no cached file, or the download is forced
+	:param url: The URL of the file to download
+	:param location: The location of the cached file
+	:param force_download: Download even if it's newer
+	:return: Whether the file was downloaded or not
+	"""
 	should_download: bool = True
-	if not force_download and os.path.isfile(latest_file_location):
-		cache_date: datetime = datetime.datetime.fromtimestamp(os.path.getmtime(latest_file_location), tz=datetime.datetime.now().astimezone().tzinfo)
-		request = urllib.request.Request(JSON_URL, method="HEAD")
+	http = urllib3.PoolManager()
+	head = http.request("HEAD", url).info()
+	if not force_download and os.path.isfile(location):
+		cache_date: datetime = datetime.datetime.fromtimestamp(os.path.getmtime(location), tz=datetime.datetime.now().astimezone().tzinfo)
 		last_modified = datetime.datetime.now() - datetime.timedelta(hours=1)  # Create the failsafe "last-modified" object
 		try:
-			with urllib.request.urlopen(request) as req:
-				# print(req.info())
-				lastmod_string = req.info()["Last-Modified"]
-				last_modified = datetime.datetime(*eut.parsedate(lastmod_string)[:6], tzinfo=datetime.timezone.utc)
-				print("Last modified: {}".format(last_modified))
-		except URLError:
+			lastmod_string = head["Last-Modified"]
+			last_modified = datetime.datetime(*eut.parsedate(lastmod_string)[:6], tzinfo=datetime.timezone.utc)
+			last_modified = last_modified.astimezone(datetime.datetime.now().astimezone().tzinfo)
+			print("Last modified: {}, {} ago".format(last_modified, datetime.datetime.now().astimezone() - last_modified))
+		except urllib3.exceptions.HTTPError:
 			print("Couldn't retrieve last-modified date. Using one hour ago...")
 		if cache_date > last_modified:
 			should_download = False
 			print(
-				"Most recent version of the file exists in cache as {} modified at {}, using cached file.\n Launch the script with -f or --force to force loading the most recent file".format(
-					os.path.abspath(latest_file_location), cache_date))
+					"Most recent version of the file exists in cache as {} modified at {}, using cached file.\n Launch the script with -f or --force to force loading the most recent file".format(
+							os.path.abspath(latest_file_location), cache_date))
 	if should_download:
 		print("Downloading most recent data...")
-		urllib.request.urlretrieve(JSON_URL, latest_file_location, reporthook=dl_progress)
+		content_length = int(head["Content-Length"])
+		downloaded = 0
+		dl_request = http.request("GET", url, preload_content=False, headers={'Accept-Encoding': 'application/gzip'})
+		dl_progress(0, 1, content_length)
+		with open(latest_file_location, "wb") as file:
+			for chunk in dl_request.stream(256 * 1024):
+				file.write(chunk)
+				downloaded += len(chunk)
+				dl_progress(downloaded, 1, content_length)
 		print()
+		dl_request.release_conn()
 		print("Data downloaded.")
+	return should_download
+
+
+def load_cases(force_download: bool) -> List[CovidCase]:
+	downloaded = download_file_if_newer(JSON_URL, latest_file_location, force_download)
 	try:
 		json_data = json.load(open(latest_file_location))
 		cases = list(map(lambda j: CovidCase.from_dict(j), json_data))
 		return cases
 	except json.decoder.JSONDecodeError:
-		if not should_download:
+		if not downloaded:
 			print("Couldn't decode cached data. Trying to redownload it...")
 			return load_cases(True)
 		else:
@@ -236,7 +256,7 @@ def validate_age_filter(arg_value: str) -> Tuple[int, Optional[int]]:
 
 def print_help():
 	print(
-		"Usage:\n\t\t covidstats.py [(-w|--window) <trend smoothing window>] [(-p|--province) <province>] [(-a|--age) <age filter>] [(-c|--cutoff) <cutoff days>] [(-d|--date) start date or offset before the cutoff date] [(-z|--zoom) plotting start date or offset before the cutoff date] [(-s|--stack) (sex|age|province)] [(-f|--force)]")
+			"Usage:\n\t\t covidstats.py [(-w|--window) <trend smoothing window>] [(-p|--province) <province>] [(-a|--age) <age filter>] [(-c|--cutoff) <cutoff days>] [(-d|--date) start date or offset before the cutoff date] [(-z|--zoom) plotting start date or offset before the cutoff date] [(-s|--stack) (sex|age|province)] [(-f|--force)]")
 	print("\tOr:\tcovidstats.py config_file (absolute path or filename in the config directory ({}))".format(os.path.abspath("config")))
 	print(
-		"\tOr:\tcovidstats.py for launching with the configuration in config/default.json if it exists, or the default config if it doesn't (and write the default config to default.json)")
+			"\tOr:\tcovidstats.py for launching with the configuration in config/default.json if it exists, or the default config if it doesn't (and write the default config to default.json)")
