@@ -142,9 +142,9 @@ def plot_cumulative_cases(
 	d_death = cumulative_deaths[-1] - cumulative_deaths[start_idx]
 	d_hosp = cumulative_hosp[-1] - cumulative_hosp[start_idx]
 	d_case = cumulative_cases[-1] - cumulative_cases[start_idx]
-	if d_case / d_death < 250:
+	if d_death > 0 and  d_case / d_death < 250:
 		plt.plot(days[start_idx::], cumulative_deaths[start_idx::], label="Deaths")
-	if d_case / d_hosp < 250:
+	if d_hosp > 0 and d_case / d_hosp < 250:
 		plt.plot(days[start_idx::], cumulative_hosp[start_idx::], label="Hospitalizations")
 	plt.yscale("log")
 	plt.title("Cumulative cases (log)")
