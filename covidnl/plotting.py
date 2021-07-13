@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 from matplotlib import pyplot as plt, ticker as ticker
 
-from covidnl.stats import calculate_smoothed_trends
+from stats import calculate_smoothed_trends
 
 
 def plot_daily_cases(

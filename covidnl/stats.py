@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 
-from covidnl.model import CaseFilter, CovidCase
+from model import CaseFilter, CovidCase
 
 AGE_CATEGORIES = (
 		"Unknown",

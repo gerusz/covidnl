@@ -6,11 +6,11 @@ from typing import Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 
-from covidnl.model import CaseFilter, CovidCase
-from covidnl.plotting import daily_cases_common, plot_cumulative_cases, plot_daily_cases, plot_r_rate, plot_stacked_cases
-from covidnl.runconfig import run_config_from_args, run_config_from_file, RunConfig
-from covidnl.stats import calculate_r_estimation, count_cumulative_cases, determine_risk_level, get_cases_per_day, separate_stacks
-from covidnl.util import load_cases, validate_date_filter
+from model import CaseFilter, CovidCase
+from plotting import daily_cases_common, plot_cumulative_cases, plot_daily_cases, plot_r_rate, plot_stacked_cases
+from runconfig import run_config_from_args, run_config_from_file, RunConfig
+from stats import calculate_r_estimation, count_cumulative_cases, determine_risk_level, get_cases_per_day, separate_stacks
+from util import load_cases, validate_date_filter
 
 DEFAULT_JSON_PATH = "config/default.json"
 

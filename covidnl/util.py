@@ -9,8 +9,8 @@ from typing import List, Optional, Tuple, Union
 import urllib3
 from progressbar import AdaptiveETA, Bar, FileTransferSpeed, Percentage, ProgressBar
 
-from covidnl.model import CovidCase
-from covidnl.stats import provinces
+from model import CovidCase
+from stats import provinces
 
 JSON_URL = "https://data.rivm.nl/covid-19/COVID-19_casus_landelijk.json"
 

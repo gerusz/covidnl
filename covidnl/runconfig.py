@@ -3,7 +3,7 @@ import json
 import sys
 from typing import Dict, Optional, Tuple, Union
 
-from covidnl.util import print_help, validate_age_filter, validate_cutoff, validate_province, validate_smoothing_window, validate_stack
+from util import print_help, validate_age_filter, validate_cutoff, validate_province, validate_smoothing_window, validate_stack
 
 
 class RunConfig:
