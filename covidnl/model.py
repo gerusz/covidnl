@@ -27,13 +27,18 @@ class CovidCase:
 		self.dead: bool = (deceased == "Yes")
 	
 	@staticmethod
-	def from_dict(jsondict: Dict[str, Any]):
+	def from_dict_parallel(jsondict: Dict[str, Any]):
+		return CovidCase.from_dict(jsondict, True)
+	
+	@staticmethod
+	def from_dict(jsondict: Dict[str, Any], skip_date_detection: bool = False):
 		"""
 		Loads the details of this case from a JSON dictionary
+		:param skip_date_detection: Skips the auto-detection of the file date (for parallel loading)
 		:param jsondict: The JSON dictionary containing the details of the case
 		:return: The CovidCase representation of the given case
 		"""
-		if CovidCase.file_date is None:
+		if not skip_date_detection and CovidCase.file_date is None:
 			CovidCase.file_date = datetime.datetime.fromisoformat(jsondict["Date_file"])
 			print("Information date: " + jsondict["Date_file"])
 		return CovidCase(

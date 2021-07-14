@@ -1,5 +1,6 @@
 import datetime
 import json
+import multiprocessing
 import os.path
 import re
 import sys
@@ -199,7 +200,7 @@ def download_file_if_newer(url: str, location: str, force_download: bool = False
 		dl_request = http.request("GET", url, preload_content=False, headers={'Accept-Encoding': 'application/gzip'})
 		dl_progress(0, 1, content_length)
 		with open(latest_file_location, "wb") as file:
-			for chunk in dl_request.stream(256 * 1024):
+			for chunk in dl_request.stream(1024 * 1024):
 				file.write(chunk)
 				downloaded += len(chunk)
 				dl_progress(downloaded, 1, content_length)
@@ -212,8 +213,14 @@ def download_file_if_newer(url: str, location: str, force_download: bool = False
 def load_cases(force_download: bool) -> List[CovidCase]:
 	downloaded = download_file_if_newer(JSON_URL, latest_file_location, force_download)
 	try:
+		print("Loading JSON file (it's {} MB (thanks Markie), be patient.)".format(os.path.getsize(latest_file_location) // (1024 * 1024)))
 		json_data = json.load(open(latest_file_location))
-		cases = list(map(lambda j: CovidCase.from_dict(j), json_data))
+		if CovidCase.file_date is None:
+			CovidCase.file_date = datetime.datetime.fromisoformat(json_data[0]["Date_file"])
+			print("File loaded. Information date: " + json_data[0]["Date_file"] + ". Loading cases...")
+		pool = multiprocessing.Pool()
+		cases = list(pool.map(CovidCase.from_dict_parallel, json_data))
+		print("{} cases loaded.".format(len(cases)))
 		return cases
 	except json.decoder.JSONDecodeError:
 		if not downloaded:
