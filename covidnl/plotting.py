@@ -3,6 +3,7 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 from matplotlib import pyplot as plt, ticker as ticker
+from numpy.ma.core import MaskedConstant
 
 from stats import calculate_smoothed_trends
 
@@ -115,6 +116,14 @@ def plot_r_rate(days: List[datetime.date], r_rates: np.ndarray, start_date: Opti
 	r_below = np.ma.masked_greater_equal(r_rates, mask_above + 0.025)
 	r_above = np.ma.masked_less_equal(r_rates, mask_below - 0.025)
 	
+	boundaries = list()
+	for idx in range(start_idx, len(r_below) - 1):
+		if isinstance(r_below[idx], MaskedConstant) and not (isinstance(r_below[idx - 1], MaskedConstant) and isinstance(r_below[idx + 1], MaskedConstant)):
+			boundaries.append(idx)
+	
+	for idx in boundaries:
+		r_below[idx] = r_above[idx]
+	
 	plt.plot(days[start_idx::], r_below[start_idx::], days[start_idx::], r_above[start_idx::])
 	plt.xlabel("Date")
 	plt.ylabel("Estimated R-rate")
@@ -142,7 +151,7 @@ def plot_cumulative_cases(
 	d_death = cumulative_deaths[-1] - cumulative_deaths[start_idx]
 	d_hosp = cumulative_hosp[-1] - cumulative_hosp[start_idx]
 	d_case = cumulative_cases[-1] - cumulative_cases[start_idx]
-	if d_death > 0 and  d_case / d_death < 250:
+	if d_death > 0 and d_case / d_death < 250:
 		plt.plot(days[start_idx::], cumulative_deaths[start_idx::], label="Deaths")
 	if d_hosp > 0 and d_case / d_hosp < 250:
 		plt.plot(days[start_idx::], cumulative_hosp[start_idx::], label="Hospitalizations")

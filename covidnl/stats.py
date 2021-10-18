@@ -3,7 +3,8 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 
-from model import CaseFilter, CovidCase
+from cache import load_cases_per_day, load_cases_per_day_for_stacking
+from model import CaseFilter
 
 AGE_CATEGORIES = (
 		"Unknown",
@@ -76,11 +77,10 @@ def cumulate_data(days: List[datetime.date], data: Dict[datetime.date, float]) -
 	return cumulative_data
 
 
-def separate_stacks(cases: List[CovidCase], days: List[datetime.date], stack: str, case_filter: CaseFilter, per_capita: bool) -> Tuple[
+def separate_stacks(days: List[datetime.date], stack: str, case_filter: CaseFilter, per_capita: bool) -> Tuple[
 	Tuple[str, ...], np.ndarray]:
 	"""
 	Returns the data represented as separate data lines by the stacking category
-	:param cases: A list of all CovidCase cases
 	:param days: A list of days (datetime.date)
 	:param stack: The stacking parameter. String, one of "province", "sex", or "age".
 	:param case_filter: A CaseFilter object
@@ -88,50 +88,24 @@ def separate_stacks(cases: List[CovidCase], days: List[datetime.date], stack: st
 	:return: A tuple consisting of a list of stack labels (strings) and a 2D NumPy array, first dimension: stack, second dimension: day.
 	"""
 	
-	stack_labels = get_stack_labels(case_filter, stack)
+	stack_labels, stacked_cases_dict = load_cases_per_day_for_stacking(case_filter, stack)
 	
 	stacked_cases_per_day: np.ndarray = np.zeros((len(stack_labels), len(days)), dtype=float)
+	for day_idx, day in enumerate(days):
+		for stack_idx, lbl in enumerate(stack_labels):
+			stacked_cases_per_day[stack_idx, day_idx] = stacked_cases_dict.get(day, {}).get(lbl, 0)
 	
-	for c_case in cases:
-		if not case_filter.filter(c_case):  # Cutoff day also integrated in the filter
-			continue
-		assign_case_to_stack(c_case, days, stack, stack_labels, stacked_cases_per_day)
 	if per_capita:
 		total_population = sum(provinces.values()) / 100000
 		for day_idx in range(len(days)):
 			normalize_to = sum(stacked_cases_per_day[:, day_idx]) / total_population
 			for (p_idx, province) in enumerate(stack_labels):
-				stacked_cases_per_day[p_idx, day_idx] = stacked_cases_per_day[p_idx, day_idx] / (provinces[province] / 100000)
+				stacked_cases_per_day[p_idx, day_idx] /= provinces[province] / 100000
 			normalization_factor = normalize_to / sum(stacked_cases_per_day[:, day_idx])
 			for p_idx in range(len(stack_labels)):
 				stacked_cases_per_day[p_idx, day_idx] = stacked_cases_per_day[p_idx, day_idx] * normalization_factor
 	
 	return stack_labels, stacked_cases_per_day
-
-
-def get_stack_labels(case_filter, stack):
-	if stack == "province":
-		province_names = list(provinces.keys())
-		province_names.sort(key=lambda prov: provinces.get(prov), reverse=True)
-		stack_labels: Tuple[str, ...] = tuple(province_names)
-	elif stack == "sex":
-		stack_labels = ("Male", "Female")
-	else:
-		stack_labels = case_filter.age_filter if case_filter.age_filter is not None else AGE_CATEGORIES
-	return stack_labels
-
-
-def assign_case_to_stack(c_case, days, stack, stack_labels, stacked_cases_per_day):
-	if stack == "province":
-		stack_key = c_case.province
-	elif stack == "sex":
-		stack_key = c_case.sex
-	else:
-		stack_key = c_case.age
-	if stack_key in stack_labels:
-		stack_idx = stack_labels.index(stack_key)
-		day_idx = days.index(c_case.day)
-		stacked_cases_per_day[stack_idx][day_idx] += 1
 
 
 def calculate_r_estimation(cases: np.ndarray, per_capita: bool) -> Tuple[np.ndarray, int]:
@@ -188,7 +162,7 @@ def calculate_r_rate_data_old_style(case_counts: np.ndarray, cumulative_cases: L
 	return cumulative_x, case_counts_used, exponent_trendline, second_wave_x, second_wave_trendline
 
 
-def get_cases_per_day(cases: List[CovidCase], case_filter: CaseFilter, per_capita: bool) -> Tuple[
+def get_cases_per_day(case_filter: CaseFilter, per_capita: bool) -> Tuple[
 	List[datetime.date],
 	np.ndarray,
 	Dict[datetime.date, int],
@@ -198,7 +172,6 @@ def get_cases_per_day(cases: List[CovidCase], case_filter: CaseFilter, per_capit
 	Dict[datetime.date, int]]:
 	"""
 	Calculates the cases per day
-	:param cases: All cases, List[CovidCase]
 	:param case_filter: The case filter, a CaseFilter
 	:param per_capita: Whether the results should be counted per 100k person.
 	:return: A Tuple consisting of:
@@ -211,17 +184,7 @@ def get_cases_per_day(cases: List[CovidCase], case_filter: CaseFilter, per_capit
 		hosp_per_day: a dictionary of death counts indexed by the days
 	"""
 	total_population = sum(provinces.values()) / 100000 if per_capita else 1
-	cases_per_day: Dict[datetime.date, int] = dict()
-	deaths_per_day: Dict[datetime.date, int] = dict()
-	hosp_per_day: Dict[datetime.date, int] = dict()
-	for c_case in cases:
-		if not case_filter.filter(c_case):  # Cutoff day also integrated in the filter
-			continue
-		cases_per_day[c_case.day] = cases_per_day.get(c_case.day, 0) + 1
-		if c_case.dead:
-			deaths_per_day[c_case.day] = deaths_per_day.get(c_case.day, 0) + 1
-		if c_case.hospitalized:
-			hosp_per_day[c_case.day] = hosp_per_day.get(c_case.day, 0) + 1
+	cases_per_day, deaths_per_day, hosp_per_day = load_cases_per_day(case_filter)
 	days: List[datetime.date] = list(cases_per_day.keys())
 	days.sort()
 	for day in days:

@@ -280,3 +280,4 @@ latest.json
 /covidnl/config/
 
 .idea/sonarlint/*
+/covidnl/cache.db

@@ -15,6 +15,26 @@ from util import load_cases, validate_date_filter
 DEFAULT_JSON_PATH = "config/default.json"
 
 
+def generate_window_title(config: RunConfig, case_filter: CaseFilter) -> str:
+	out = "Covid-19"
+	if case_filter.province_filter is not None:
+		out += " in " + case_filter.province_filter
+	else:
+		out += " in the whole Netherlands"
+	if case_filter.age_filter is not None:
+		if case_filter.age_filter[1] is not None:
+			out += " for ages {}-{}".format(case_filter.age_filter[0], case_filter.age_filter[1])
+		else:
+			out += " for ages {}+".format(case_filter.age_filter[0])
+	if case_filter.from_date is not None:
+		out += ", using only results after {}".format(case_filter.from_date)
+	if config.zoom is not None:
+		out += ", showing only results after {}".format(config.zoom)
+	if config.filter_params["cutoff_days"] != 7:
+		out += ", cutoff: {}".format(case_filter.cutoff_date)
+	return out
+
+
 def main(config: RunConfig = RunConfig()):
 	"""
 	The main function for the stat script. Downloads, processes, and displays the stats.
@@ -24,7 +44,7 @@ def main(config: RunConfig = RunConfig()):
 	
 	print("Time: {}".format(datetime.datetime.now()))
 	
-	cases = load_cases(config.force_download)
+	load_cases(config.force_download)
 	
 	cutoff_day, from_day = render_date_filter(config)
 	zoom_to = render_zoom(config, cutoff_day)
@@ -32,7 +52,7 @@ def main(config: RunConfig = RunConfig()):
 	case_filter = case_filter_from_run_config(config, cutoff_day, from_day)
 	
 	# Calculate the common stats
-	days, case_counts, cases_per_day, death_counts, deaths_per_day, hosp_counts, hosp_per_day = get_cases_per_day(cases, case_filter, config.per_capita)
+	days, case_counts, cases_per_day, death_counts, deaths_per_day, hosp_counts, hosp_per_day = get_cases_per_day(case_filter, config.per_capita)
 	cumulative_cases, cumulative_deaths, cumulative_hosp = count_cumulative_cases(days, cases_per_day, deaths_per_day, hosp_per_day)
 	risk_level, cases_per_100k, hosp_per_mil = determine_risk_level(case_counts, hosp_counts)
 	print("Current risk level: {} (cases/100k last week: {}, hosp./mil last week: {})".format(risk_level, int(cases_per_100k), int(hosp_per_mil)))
@@ -48,7 +68,7 @@ def main(config: RunConfig = RunConfig()):
 	if config.stack_by is None:
 		plot_daily_cases(days, case_counts, death_counts, hosp_counts, config.smoothing_window, zoom_to)
 	else:
-		stack_labels, stacked_cases_per_day = separate_stacks(cases, days, config.stack_by, case_filter, config.per_capita)
+		stack_labels, stacked_cases_per_day = separate_stacks(days, config.stack_by, case_filter, config.per_capita)
 		plot_stacked_cases(days, stacked_cases_per_day, stack_labels, config.stack_by, zoom_to)
 	daily_cases_common(config.per_capita, config.logarithmic)
 	
@@ -63,8 +83,7 @@ def main(config: RunConfig = RunConfig()):
 	plot_r_rate(days, r_rates, zoom_to if zoom_to is not None and zoom_to > r_start_day else r_start_day)
 	
 	# Window data
-	plt.get_current_fig_manager().set_window_title("Covid 19 in " + (
-			"the whole Netherlands" if case_filter.province_filter is None else case_filter.province_filter))
+	plt.get_current_fig_manager().set_window_title(generate_window_title(config, case_filter))
 	plt.subplots_adjust(hspace=0.35, wspace=0.25, left=0.07, right=0.95, top=0.95, bottom=0.09)
 	plt.show()
 
@@ -137,7 +156,7 @@ if __name__ == "__main__":
 			if not config_path.startswith("config"):
 				config_path = "config/" + config_path
 			if not config_path.endswith(".json"):
-				config_path = config_path + ".json"
+				config_path += ".json"
 		run_config = run_config_from_file(config_path)
 	else:
 		run_config = run_config_from_args(sys.argv[1:])

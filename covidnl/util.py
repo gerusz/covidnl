@@ -5,11 +5,12 @@ import os.path
 import re
 import sys
 from email import utils as eut
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import urllib3
 from progressbar import AdaptiveETA, Bar, FileTransferSpeed, Percentage, ProgressBar
 
+from cache import cache_cases
 from model import CovidCase
 from stats import provinces
 
@@ -210,22 +211,26 @@ def download_file_if_newer(url: str, location: str, force_download: bool = False
 	return should_download
 
 
-def load_cases(force_download: bool) -> List[CovidCase]:
+def load_cases(force_download: bool):
 	downloaded = download_file_if_newer(JSON_URL, latest_file_location, force_download)
 	try:
-		print("Loading JSON file (it's {} MB (thanks Markie), be patient.)".format(os.path.getsize(latest_file_location) // (1024 * 1024)))
-		json_data = json.load(open(latest_file_location))
-		if CovidCase.file_date is None:
-			CovidCase.file_date = datetime.datetime.fromisoformat(json_data[0]["Date_file"])
-			print("File loaded. Information date: " + json_data[0]["Date_file"] + ". Loading cases...")
-		pool = multiprocessing.Pool()
-		cases = list(pool.map(CovidCase.from_dict_parallel, json_data))
-		print("{} cases loaded.".format(len(cases)))
-		return cases
+		if downloaded:
+			print("Loading JSON file (it's {} MB (thanks Markie), be patient.)".format(os.path.getsize(latest_file_location) // (1024 * 1024)))
+			json_data = json.load(open(latest_file_location, encoding="utf8"))
+			if CovidCase.file_date is None:
+				CovidCase.file_date = datetime.datetime.fromisoformat(json_data[0]["Date_file"])
+				print("File loaded. Information date: " + json_data[0]["Date_file"] + ". Loading cases...")
+			pool = multiprocessing.Pool()
+			cases = list(pool.map(CovidCase.from_dict_parallel, json_data))
+			print("{} cases loaded.".format(len(cases)))
+			# Caching experiment
+			cache_cases(cases)
+		else:
+			CovidCase.file_date = datetime.datetime.fromtimestamp(os.path.getmtime(latest_file_location), tz=datetime.datetime.now().astimezone().tzinfo)
 	except json.decoder.JSONDecodeError:
 		if not downloaded:
 			print("Couldn't decode cached data. Trying to redownload it...")
-			return load_cases(True)
+			load_cases(True)
 		else:
 			print("Downloaded data invalid. Try again.")
 			sys.exit(-2)
