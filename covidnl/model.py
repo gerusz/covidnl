@@ -16,14 +16,12 @@ class CovidCase:
 			age_group: str,
 			sex: str,
 			province: str,
-			hospital_admission: str,
 			deceased: str
 			):
 		self.day: datetime.date = datetime.date.fromisoformat(date_statistics)
 		self.age: str = age_group
 		self.sex: str = sex
 		self.province: str = province
-		self.hospitalized: bool = (hospital_admission == "Yes")
 		self.dead: bool = (deceased == "Yes")
 	
 	@staticmethod
@@ -42,12 +40,11 @@ class CovidCase:
 			CovidCase.file_date = datetime.datetime.fromisoformat(jsondict["Date_file"])
 			print("Information date: " + jsondict["Date_file"])
 		return CovidCase(
-				jsondict["Date_statistics"],
-				jsondict["Agegroup"],
-				jsondict["Sex"],
-				jsondict["Province"],
-				jsondict["Hospital_admission"],
-				jsondict["Deceased"]
+				jsondict.get("Date_statistics", ""),
+				jsondict.get("Agegroup", ""),
+				jsondict.get("Sex", ""),
+				jsondict.get("Province", ""),
+				jsondict.get("Deceased", "No")
 				)
 
 

@@ -24,17 +24,15 @@ AGE_CATEGORIES = (
 def calculate_smoothed_trends(
 		case_counts: np.ndarray,
 		death_counts: np.ndarray,
-		hosp_counts: np.ndarray,
-		smoothing_window: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+		smoothing_window: int) -> Tuple[np.ndarray, np.ndarray]:
 	"""
 	Calculates the smoothed trends with the given smoothing window
 	:param case_counts: Cases per day
 	:param death_counts: Deaths per day
-	:param hosp_counts: Hospitalizations per day
 	:param smoothing_window: How many days should the smoothing look behind
 	:return: A tuple of NumPy arrays: (smoothed_cases, smoothed_deaths)
 	"""
-	return smooth_data_line(case_counts, smoothing_window), smooth_data_line(death_counts, smoothing_window), smooth_data_line(hosp_counts, smoothing_window)
+	return smooth_data_line(case_counts, smoothing_window), smooth_data_line(death_counts, smoothing_window)
 
 
 def smooth_data_line(data_line: np.ndarray, smoothing_window: int) -> np.ndarray:
@@ -55,17 +53,15 @@ def smooth_data_line(data_line: np.ndarray, smoothing_window: int) -> np.ndarray
 def count_cumulative_cases(
 		days: List[datetime.date],
 		cases_per_day: Dict[datetime.date, float],
-		deaths_per_day: Dict[datetime.date, float],
-		hosp_per_day: Dict[datetime.date, float]) -> Tuple[List[float], List[float], List[float]]:
+		deaths_per_day: Dict[datetime.date, float]) -> Tuple[List[float], List[float]]:
 	"""
 	Calculates the cumulative cases and deaths
 	:param days: The list of days with at least one case or death
 	:param cases_per_day: A dictionary of case counts indexed by days
 	:param deaths_per_day: A dictionary of death counts indexed by days
-	:param hosp_per_day: A dictionary of hospitalization counts indexed by days
 	:return: A tuple of lists containing the cumulative cases and cumulative deaths: (cumulative_cases, cumulative_deaths)
 	"""
-	return cumulate_data(days, cases_per_day), cumulate_data(days, deaths_per_day), cumulate_data(days, hosp_per_day)
+	return cumulate_data(days, cases_per_day), cumulate_data(days, deaths_per_day)
 
 
 def cumulate_data(days: List[datetime.date], data: Dict[datetime.date, float]) -> List[float]:
@@ -167,8 +163,6 @@ def get_cases_per_day(case_filter: CaseFilter, per_capita: bool) -> Tuple[
 	np.ndarray,
 	Dict[datetime.date, int],
 	np.ndarray,
-	Dict[datetime.date, int],
-	np.ndarray,
 	Dict[datetime.date, int]]:
 	"""
 	Calculates the cases per day
@@ -180,28 +174,22 @@ def get_cases_per_day(case_filter: CaseFilter, per_capita: bool) -> Tuple[
 		cases_per_day: a dictionary of case counts indexed by the days
 		death_counts: a NumPy array with the raw death counts
 		deaths_per_day: a dictionary of death counts indexed by the days
-		hosp_counts: a NumPy array with the raw hospitalization counts
-		hosp_per_day: a dictionary of death counts indexed by the days
 	"""
 	total_population = sum(provinces.values()) / 100000 if per_capita else 1
-	cases_per_day, deaths_per_day, hosp_per_day = load_cases_per_day(case_filter)
+	cases_per_day, deaths_per_day = load_cases_per_day(case_filter)
 	days: List[datetime.date] = list(cases_per_day.keys())
 	days.sort()
 	for day in days:
 		if day not in deaths_per_day.keys():
 			deaths_per_day[day] = 0
-		if day not in hosp_per_day.keys():
-			hosp_per_day[day] = 0
 		cases_per_day[day] /= total_population
 		deaths_per_day[day] /= total_population
-		hosp_per_day[day] /= total_population
 	case_counts: np.ndarray = np.array(tuple(cases_per_day[day] for day in days))
 	death_counts: np.ndarray = np.array(tuple(deaths_per_day[day] for day in days))
-	hosp_counts: np.ndarray = np.array(tuple(hosp_per_day[day] for day in days))
-	return days, case_counts, cases_per_day, death_counts, deaths_per_day, hosp_counts, hosp_per_day
+	return days, case_counts, cases_per_day, death_counts, deaths_per_day
 
 
-def determine_risk_level(case_counts: np.ndarray, hosp_counts: np.ndarray, cutoff: int = 7) -> Tuple[int, int, int]:
+def determine_risk_level(case_counts: np.ndarray, cutoff: int = 7) -> Tuple[int, int]:
 	population = sum(provinces.values()) / 100000
 	cases_last_week = sum(case_counts[len(case_counts) - cutoff - 7:len(case_counts) - cutoff])
 	cases_per_100k = cases_last_week / population
@@ -213,26 +201,7 @@ def determine_risk_level(case_counts: np.ndarray, hosp_counts: np.ndarray, cutof
 	if cases_per_100k >= 250:
 		level_by_cases += 1
 	
-	hosp_last_week = sum(hosp_counts[len(hosp_counts) - cutoff - 7:len(hosp_counts) - cutoff])
-	hosp_per_mil = (hosp_last_week * 10) / population
-	level_by_hosp_pm = 1
-	if hosp_per_mil >= 4:
-		level_by_hosp_pm += 1
-	if hosp_per_mil >= 16:
-		level_by_hosp_pm += 1
-	if hosp_per_mil >= 27:
-		level_by_hosp_pm += 1
-	
-	level_by_hosp_daily = 1
-	examined_period = hosp_counts[len(hosp_counts) - cutoff - 14:len(hosp_counts) - cutoff]
-	if any(dh >= 12 for dh in examined_period):
-		level_by_hosp_daily += 1
-	if any(dh >= 40 for dh in examined_period):
-		level_by_hosp_daily += 1
-	if any(dh >= 80 for dh in examined_period):
-		level_by_hosp_daily += 1
-	
-	return max(level_by_cases, level_by_hosp_pm, level_by_hosp_daily), cases_per_100k, hosp_per_mil
+	return level_by_cases, cases_per_100k
 
 
 provinces: Dict[str, int] = {

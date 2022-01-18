@@ -18,11 +18,11 @@ def cache_cases(cases: List[CovidCase]):
 	cur.execute("PRAGMA ENCODING=UTF8")
 	cur.execute("DROP TABLE IF EXISTS cases")
 	cur.execute(
-		"CREATE TABLE cases (date DATE NOT NULL, province TEXT NOT NULL, age_group TEXT NOT NULL, sex CHARACTER(1) NOT NULL, case_count INT, hosp_count INT, death_count INT, PRIMARY KEY(date, province, age_group, sex))")
+			"CREATE TABLE cases (date DATE NOT NULL, province TEXT NOT NULL, age_group TEXT NOT NULL, sex CHARACTER(1) NOT NULL, case_count INT, death_count INT, PRIMARY KEY(date, province, age_group, sex))")
 	con.commit()
 	
 	# set up the cached values
-	table_rows: Dict[Tuple[datetime.date, str, str, str], Tuple[int, int, int]] = {}
+	table_rows: Dict[Tuple[datetime.date, str, str, str], Tuple[int, int]] = {}
 	
 	def cache_key(case: CovidCase) -> Tuple[datetime.date, str, str, str]:
 		return case.day, case.province, case.age, case.sex
@@ -30,16 +30,16 @@ def cache_cases(cases: List[CovidCase]):
 	for c in cases:
 		key = cache_key(c)
 		current_row = table_rows.get(key, (0, 0, 0))
-		new_row = (current_row[0] + 1, current_row[1] + 1 if c.hospitalized else current_row[1], current_row[2] + 1 if c.dead else current_row[2])
+		new_row = (current_row[0] + 1, current_row[1] + 1 if c.dead else current_row[1])
 		table_rows[key] = new_row
 	
 	print("{} rows will be cached".format(len(table_rows)))
 	# insert the values into the cache
-	command_format = "INSERT INTO cases VALUES ('{}','{}','{}','{}',{},{},{})"
+	command_format = "INSERT INTO cases VALUES ('{}','{}','{}','{}',{},{})"
 	for key in table_rows.keys():
 		value = table_rows[key]
 		day = key[0].strftime(date_format)
-		command = command_format.format(day, key[1], key[2], key[3], value[0], value[1], value[2])
+		command = command_format.format(day, key[1], key[2], key[3], value[0], value[1])
 		cur.execute(command)
 	con.commit()
 	con.close()
@@ -61,10 +61,10 @@ def filter_to_where(case_filter: CaseFilter) -> str:
 	return "WHERE " + " AND ".join(conditions)
 
 
-def load_cases_per_day(case_filter: CaseFilter) -> Tuple[Dict[datetime.date, int], Dict[datetime.date, int], Dict[datetime.date, int]]:
+def load_cases_per_day(case_filter: CaseFilter) -> Tuple[Dict[datetime.date, int], Dict[datetime.date, int]]:
 	condition = filter_to_where(case_filter)
 	con = sqlite3.connect(cache_location)
-	command = """SELECT date, SUM(case_count) as daily_cases, sum(hosp_count) as daily_hospitalizations, sum(death_count) as daily_deaths
+	command = """SELECT date, SUM(case_count) as daily_cases, sum(death_count) as daily_deaths
 	FROM cases
 	{}
 	GROUP BY date
@@ -72,14 +72,12 @@ def load_cases_per_day(case_filter: CaseFilter) -> Tuple[Dict[datetime.date, int
 	cur = con.cursor()
 	cases_per_day: Dict[datetime.date, int] = dict()
 	deaths_per_day: Dict[datetime.date, int] = dict()
-	hosp_per_day: Dict[datetime.date, int] = dict()
 	for row in cur.execute(command):
 		day = datetime.strptime(row[0], date_format).date()
 		cases_per_day[day] = row[1]
-		deaths_per_day[day] = row[3]
-		hosp_per_day[day] = row[2]
+		deaths_per_day[day] = row[2]
 	
-	return cases_per_day, deaths_per_day, hosp_per_day
+	return cases_per_day, deaths_per_day
 
 
 def load_cases_per_day_for_stacking(case_filter: CaseFilter, stack: str) -> Tuple[Tuple[str, ...], Dict[datetime.date, Dict[str, int]]]:

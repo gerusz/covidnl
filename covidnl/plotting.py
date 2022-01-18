@@ -12,7 +12,6 @@ def plot_daily_cases(
 		days: List[datetime.date],
 		case_counts: np.ndarray,
 		death_counts: np.ndarray,
-		hosp_counts: np.ndarray,
 		smoothing_window: int,
 		start_date: Optional[datetime.date] = None
 		):
@@ -21,7 +20,7 @@ def plot_daily_cases(
 	title = "Daily cases"
 	
 	if smoothing_window != 0:
-		smoothed_cases, smoothed_deaths, smoothed_hosp = calculate_smoothed_trends(case_counts, death_counts, hosp_counts, smoothing_window)
+		smoothed_cases, smoothed_deaths = calculate_smoothed_trends(case_counts, death_counts, smoothing_window)
 		shift = smoothing_window // 2
 		title += " and trend (smoothing window: {})".format(smoothing_window)
 	
@@ -38,12 +37,6 @@ def plot_daily_cases(
 		# If the above condition is true, the variables are set.
 		# noinspection PyUnboundLocalVariable
 		plt.plot(days[start_idx:-shift:], smoothed_deaths[start_idx + shift::], label="Death trend ({} day avg.)".format(smoothing_window))
-	
-	plt.plot(days[start_idx::], hosp_counts[start_idx::], label="Hospitalizations")
-	if smoothing_window != 0:
-		# If the above condition is true, the variables are set.
-		# noinspection PyUnboundLocalVariable
-		plt.plot(days[start_idx:-shift:], smoothed_hosp[start_idx + shift::], label="Hospitalization trend ({} day avg.)".format(smoothing_window))
 	print("Daily cases plotted.")
 
 
@@ -70,7 +63,7 @@ def plot_stacked_cases(
 	print("Stacked cases plotted.")
 
 
-def daily_cases_common(per_capita: bool = False, logarithmic: bool = False):
+def daily_cases_common(per_capita: bool = False, logarithmic: bool = False, minimum=0, maximum=1):
 	plt.xlabel("Date")
 	plt.xticks(rotation=90)
 	x_axis = plt.gcf().axes[0].get_xaxis()
@@ -78,10 +71,10 @@ def daily_cases_common(per_capita: bool = False, logarithmic: bool = False):
 	x_axis.set_major_locator(ticker.MultipleLocator(7))
 	x_axis.set_minor_locator(ticker.AutoMinorLocator(7))
 	if per_capita:
-		y_axis.set_major_locator(ticker.MultipleLocator(1))
+		y_axis.set_major_locator(ticker.MultipleLocator(1) if maximum - minimum < 10000 else ticker.MultipleLocator(2))
 		y_axis.set_minor_locator(ticker.AutoMinorLocator(4))
 	else:
-		y_axis.set_major_locator(ticker.MultipleLocator(500))
+		y_axis.set_major_locator(ticker.MultipleLocator(500) if maximum - minimum < 10000 else ticker.MultipleLocator(1000))
 		y_axis.set_minor_locator(ticker.AutoMinorLocator(5))
 	if logarithmic:
 		plt.yscale("log")
@@ -142,19 +135,15 @@ def plot_cumulative_cases(
 		days: List[datetime.date],
 		cumulative_cases: List[float],
 		cumulative_deaths: List[float],
-		cumulative_hosp: List[float],
 		start_date: Optional[datetime.date] = None):
 	start_idx = zoom_start_idx(days, start_date)
 	
 	plt.plot(days[start_idx::], cumulative_cases[start_idx::], label="Cases")
 	
 	d_death = cumulative_deaths[-1] - cumulative_deaths[start_idx]
-	d_hosp = cumulative_hosp[-1] - cumulative_hosp[start_idx]
 	d_case = cumulative_cases[-1] - cumulative_cases[start_idx]
-	if d_death > 0 and d_case / d_death < 250:
+	if d_death > 0 and d_case / d_death < 500:
 		plt.plot(days[start_idx::], cumulative_deaths[start_idx::], label="Deaths")
-	if d_hosp > 0 and d_case / d_hosp < 250:
-		plt.plot(days[start_idx::], cumulative_hosp[start_idx::], label="Hospitalizations")
 	plt.yscale("log")
 	plt.title("Cumulative cases (log)")
 	plt.xlabel("Date")

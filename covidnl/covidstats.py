@@ -52,10 +52,10 @@ def main(config: RunConfig = RunConfig()):
 	case_filter = case_filter_from_run_config(config, cutoff_day, from_day)
 	
 	# Calculate the common stats
-	days, case_counts, cases_per_day, death_counts, deaths_per_day, hosp_counts, hosp_per_day = get_cases_per_day(case_filter, config.per_capita)
-	cumulative_cases, cumulative_deaths, cumulative_hosp = count_cumulative_cases(days, cases_per_day, deaths_per_day, hosp_per_day)
-	risk_level, cases_per_100k, hosp_per_mil = determine_risk_level(case_counts, hosp_counts)
-	print("Current risk level: {} (cases/100k last week: {}, hosp./mil last week: {})".format(risk_level, int(cases_per_100k), int(hosp_per_mil)))
+	days, case_counts, cases_per_day, death_counts, deaths_per_day = get_cases_per_day(case_filter, config.per_capita)
+	cumulative_cases, cumulative_deaths = count_cumulative_cases(days, cases_per_day, deaths_per_day)
+	risk_level, cases_per_100k = determine_risk_level(case_counts)
+	print("Current risk level: {} (cases/100k last week: {})".format(risk_level, int(cases_per_100k)))
 	
 	# BMH has almost enough colors for the age and the province stacking, and I'm too lazy to make my own palettes, so...
 	plt.style.use("bmh")
@@ -66,15 +66,15 @@ def main(config: RunConfig = RunConfig()):
 	# Daily cases plot
 	plt.subplot(211)  # Span the top half of the window
 	if config.stack_by is None:
-		plot_daily_cases(days, case_counts, death_counts, hosp_counts, config.smoothing_window, zoom_to)
+		plot_daily_cases(days, case_counts, death_counts, config.smoothing_window, zoom_to)
 	else:
 		stack_labels, stacked_cases_per_day = separate_stacks(days, config.stack_by, case_filter, config.per_capita)
 		plot_stacked_cases(days, stacked_cases_per_day, stack_labels, config.stack_by, zoom_to)
-	daily_cases_common(config.per_capita, config.logarithmic)
+	daily_cases_common(config.per_capita, config.logarithmic, min(min(case_counts), min(death_counts)), max(max(case_counts), max(death_counts)))
 	
 	# Cumulative cases plot
 	plt.subplot(223)  # Bottom left
-	plot_cumulative_cases(days, cumulative_cases, cumulative_deaths, cumulative_hosp, zoom_to)
+	plot_cumulative_cases(days, cumulative_cases, cumulative_deaths, zoom_to)
 	
 	# Reproduction rate plot
 	plt.subplot(224)  # Bottom right

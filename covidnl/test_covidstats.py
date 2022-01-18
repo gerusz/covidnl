@@ -21,10 +21,10 @@ class TestCaseFilter(TestCase):
 		self.assertEqual(multiple_ranges_inexact, ("20-29", "30-39", "40-49"), "Multiple inexact ranges failed")
 	
 	def test_filter(self):
-		matching_both_case = CovidCase("2020-10-04", "30-39", "Male", "Zuid-Holland", "No", "No")
-		matching_age_case = CovidCase("2020-10-04", "30-39", "Male", "Noord-Holland", "No", "No")
-		matching_province_case = CovidCase("2020-10-04", "50-59", "Male", "Zuid-Holland", "No", "No")
-		matching_none_case = CovidCase("2020-10-04", "50-59", "Male", "Noord-Holland", "No", "No")
+		matching_both_case = CovidCase("2020-10-04", "30-39", "Male", "Zuid-Holland", "No")
+		matching_age_case = CovidCase("2020-10-04", "30-39", "Male", "Noord-Holland", "No")
+		matching_province_case = CovidCase("2020-10-04", "50-59", "Male", "Zuid-Holland", "No")
+		matching_none_case = CovidCase("2020-10-04", "50-59", "Male", "Noord-Holland", "No")
 		
 		blank_filter = CaseFilter()
 		province_filter = CaseFilter("Zuid-Holland")
