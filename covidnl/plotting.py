@@ -70,11 +70,15 @@ def daily_cases_common(per_capita: bool = False, logarithmic: bool = False, mini
 	y_axis = plt.gcf().axes[0].get_yaxis()
 	x_axis.set_major_locator(ticker.MultipleLocator(7))
 	x_axis.set_minor_locator(ticker.AutoMinorLocator(7))
+	value_range = maximum - minimum
+	tick_multiplier = 1
+	while value_range / (tick_multiplier * 500) > 25:
+		tick_multiplier *= 2
 	if per_capita:
-		y_axis.set_major_locator(ticker.MultipleLocator(1) if maximum - minimum < 10000 else ticker.MultipleLocator(2))
+		y_axis.set_major_locator(ticker.MultipleLocator(tick_multiplier))
 		y_axis.set_minor_locator(ticker.AutoMinorLocator(4))
 	else:
-		y_axis.set_major_locator(ticker.MultipleLocator(500) if maximum - minimum < 10000 else ticker.MultipleLocator(1000))
+		y_axis.set_major_locator(ticker.MultipleLocator(500 * tick_multiplier))
 		y_axis.set_minor_locator(ticker.AutoMinorLocator(5))
 	if logarithmic:
 		plt.yscale("log")
