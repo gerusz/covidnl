@@ -6,7 +6,7 @@ from typing import Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 
-from model import CaseFilter, CovidCase
+from model import CaseFilter, CovidFileMeta
 from plotting import daily_cases_common, plot_cumulative_cases, plot_daily_cases, plot_r_rate, plot_stacked_cases
 from runconfig import run_config_from_args, run_config_from_file, RunConfig
 from stats import calculate_r_estimation, count_cumulative_cases, determine_risk_level, get_cases_per_day, separate_stacks
@@ -116,7 +116,7 @@ def render_date_filter(config: RunConfig) -> Tuple[datetime.date, Optional[datet
 	:param config: The run config
 	:return: A tuple containing the cutoff date (always) and the left-cutoff date (optional)
 	"""
-	cutoff_day: datetime.date = CovidCase.file_date.date() - datetime.timedelta(days=config.filter_params.get("cutoff_days", 0))
+	cutoff_day: datetime.date = CovidFileMeta.file_date.date() - datetime.timedelta(days=config.filter_params.get("cutoff_days", 0))
 	print("Cutoff: {}".format(cutoff_day))
 	from_day: Union[None, datetime.date] = None
 	date_filter_str = config.filter_params.get("date_filter", None)

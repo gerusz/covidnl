@@ -1,51 +1,13 @@
 import datetime
 import sys
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 
-class CovidCase:
+class CovidFileMeta:
 	"""
-	Represents a single registered case
+	Represents the metadata of the case file
 	"""
-	
 	file_date: datetime = None
-	
-	def __init__(
-			self,
-			date_statistics: str,
-			age_group: str,
-			sex: str,
-			province: str,
-			deceased: str
-			):
-		self.day: datetime.date = datetime.date.fromisoformat(date_statistics)
-		self.age: str = age_group
-		self.sex: str = sex
-		self.province: str = province
-		self.dead: bool = (deceased == "Yes")
-	
-	@staticmethod
-	def from_dict_parallel(jsondict: Dict[str, Any]):
-		return CovidCase.from_dict(jsondict, True)
-	
-	@staticmethod
-	def from_dict(jsondict: Dict[str, Any], skip_date_detection: bool = False):
-		"""
-		Loads the details of this case from a JSON dictionary
-		:param skip_date_detection: Skips the auto-detection of the file date (for parallel loading)
-		:param jsondict: The JSON dictionary containing the details of the case
-		:return: The CovidCase representation of the given case
-		"""
-		if not skip_date_detection and CovidCase.file_date is None:
-			CovidCase.file_date = datetime.datetime.fromisoformat(jsondict["Date_file"])
-			print("Information date: " + jsondict["Date_file"])
-		return CovidCase(
-				jsondict.get("Date_statistics", ""),
-				jsondict.get("Agegroup", ""),
-				jsondict.get("Sex", ""),
-				jsondict.get("Province", ""),
-				jsondict.get("Deceased", "No")
-				)
 
 
 class CaseFilter:
@@ -132,7 +94,7 @@ class CaseFilter:
 		self.age_filter = CaseFilter.process_age_filter(age_filter) if age_filter is not None else None
 		self.from_date = from_date
 		self.cutoff_date = cutoff_date
-		self.filters: List[Callable[[CovidCase], bool]] = list()
+		self.filters: List[Callable[[CovidFileMeta], bool]] = list()
 		if self.cutoff_date is not None:
 			self.filters.append(lambda x: self.cutoff_date >= x.day)
 		if self.from_date is not None:
@@ -141,6 +103,3 @@ class CaseFilter:
 			self.filters.append(lambda x: self.province_filter == x.province)
 		if self.age_filter is not None:
 			self.filters.append(lambda x: x.age in self.age_filter)
-	
-	def filter(self, c_case: CovidCase) -> bool:
-		return all(map(lambda f: f(c_case), self.filters))

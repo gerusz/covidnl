@@ -1,15 +1,15 @@
+import datetime
 import sqlite3
-from datetime import datetime
 from typing import Dict, List, Tuple
 
-from model import CaseFilter, CovidCase
+from model import CaseFilter
 
 date_format = "%Y-%m-%d"
 
 cache_location = "cache.db"
 
 
-def cache_cases(cases: List[CovidCase]):
+def cache_cases(cases: List[Dict[str, str]]):
 	con = sqlite3.connect(cache_location)
 	print("Creating DB cache...")
 	
@@ -24,13 +24,21 @@ def cache_cases(cases: List[CovidCase]):
 	# set up the cached values
 	table_rows: Dict[Tuple[datetime.date, str, str, str], Tuple[int, int]] = {}
 	
-	def cache_key(case: CovidCase) -> Tuple[datetime.date, str, str, str]:
-		return case.day, case.province, case.age, case.sex
+	def cache_key(case: Dict[str, str]) -> Tuple[datetime.date, str, str, str]:
+		return (
+				datetime.date.fromisoformat(case.get("Date_statistics", "")),
+				case.get("Province", ""),
+				case.get("Agegroup", ""),
+				case.get("Sex", "")
+				)
+	
+	def is_dead(case: Dict[str, str]) -> bool:
+		return case.get("Deceased", "No") == "Yes"
 	
 	for c in cases:
 		key = cache_key(c)
 		current_row = table_rows.get(key, (0, 0, 0))
-		new_row = (current_row[0] + 1, current_row[1] + 1 if c.dead else current_row[1])
+		new_row = (current_row[0] + 1, current_row[1] + 1 if is_dead(c) else current_row[1])
 		table_rows[key] = new_row
 	
 	print("{} rows will be cached".format(len(table_rows)))
@@ -73,7 +81,7 @@ def load_cases_per_day(case_filter: CaseFilter) -> Tuple[Dict[datetime.date, int
 	cases_per_day: Dict[datetime.date, int] = dict()
 	deaths_per_day: Dict[datetime.date, int] = dict()
 	for row in cur.execute(command):
-		day = datetime.strptime(row[0], date_format).date()
+		day = datetime.datetime.strptime(row[0], date_format).date()
 		cases_per_day[day] = row[1]
 		deaths_per_day[day] = row[2]
 	
@@ -101,7 +109,7 @@ def load_cases_per_day_for_stacking(case_filter: CaseFilter, stack: str) -> Tupl
 	stacked_cases: Dict[datetime.date, Dict[str, int]] = {}
 	stack_keys = set()
 	for row in cur.execute(command):
-		day = datetime.strptime(row[0], date_format).date()
+		day = datetime.datetime.strptime(row[0], date_format).date()
 		stack_key = row[1]
 		cases_per_day = row[2]
 		if day not in stacked_cases:

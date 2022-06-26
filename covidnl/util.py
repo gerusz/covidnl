@@ -1,6 +1,5 @@
 import datetime
 import json
-import multiprocessing
 import os.path
 import re
 import sys
@@ -11,7 +10,7 @@ import urllib3
 from progressbar import AdaptiveETA, Bar, FileTransferSpeed, Percentage, ProgressBar
 
 from cache import cache_cases
-from model import CovidCase
+from model import CovidFileMeta
 from stats import provinces
 
 JSON_URL = "https://data.rivm.nl/covid-19/COVID-19_casus_landelijk.json"
@@ -217,16 +216,14 @@ def load_cases(force_download: bool):
 		if downloaded:
 			print("Loading JSON file (it's {} MB (thanks Markie), be patient.)".format(os.path.getsize(latest_file_location) // (1024 * 1024)))
 			json_data = json.load(open(latest_file_location, encoding="utf8"))
-			if CovidCase.file_date is None:
-				CovidCase.file_date = datetime.datetime.fromisoformat(json_data[0]["Date_file"])
+			if CovidFileMeta.file_date is None:
+				CovidFileMeta.file_date = datetime.datetime.fromisoformat(json_data[0]["Date_file"])
 				print("File loaded. Information date: " + json_data[0]["Date_file"] + ". Loading cases...")
-			pool = multiprocessing.Pool()
-			cases = list(pool.map(CovidCase.from_dict_parallel, json_data))
-			print("{} cases loaded.".format(len(cases)))
+			print("{} cases loaded.".format(len(json_data)))
 			# Caching experiment
-			cache_cases(cases)
+			cache_cases(json_data)
 		else:
-			CovidCase.file_date = datetime.datetime.fromtimestamp(os.path.getmtime(latest_file_location), tz=datetime.datetime.now().astimezone().tzinfo)
+			CovidFileMeta.file_date = datetime.datetime.fromtimestamp(os.path.getmtime(latest_file_location), tz=datetime.datetime.now().astimezone().tzinfo)
 	except json.decoder.JSONDecodeError:
 		if not downloaded:
 			print("Couldn't decode cached data. Trying to redownload it...")
